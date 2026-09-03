@@ -10,7 +10,7 @@
  * into lines and a query pays for the handful of terms it actually touches.
  */
 
-import { INDEX, WORD_COUNTS, TOKEN_COUNT } from "./data/search-index.ts";
+import { INDEX, WORD_COUNTS, TOKEN_COUNT, DOC_FREQUENCIES } from "./data/search-index.ts";
 import { decodeDeltas, TOTAL_VERSES, verseAt, type CorpusVerse } from "./corpus.ts";
 import { FAMILY_GROUPS } from "./data/families.ts";
 
@@ -54,6 +54,15 @@ const POSTINGS_CACHE: (Int32Array | undefined)[] = new Array<Int32Array | undefi
 );
 
 const WORD_LENGTHS: Int32Array = decodeDeltas(WORD_COUNTS, TOTAL_VERSES);
+
+/**
+ * How many verses each token appears in.
+ *
+ * Shipped rather than derived, because weighing a term otherwise means decoding
+ * its postings purely to measure their length — and a trailing wildcard can
+ * expand to dozens of terms, none of which the query may end up scanning.
+ */
+const DOC_FREQUENCY: Int32Array = decodeDeltas(DOC_FREQUENCIES, TOKEN_COUNT);
 
 /**
  * Surface forms grouped by lemma, so "speak" reaches "spake" and "say" reaches
@@ -222,7 +231,7 @@ function resolveTerm(token: string, isLast: boolean): Term | null {
   if (indices.size === 0) return null;
   const list = [...indices];
   let frequency = 0;
-  for (const index of list) frequency += postingsAt(index).length;
+  for (const index of list) frequency += DOC_FREQUENCY[index]!;
   return { indices: list, documentFrequency: frequency };
 }
 
