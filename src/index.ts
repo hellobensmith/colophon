@@ -7,7 +7,6 @@
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { cache } from "hono/cache";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import {
@@ -26,7 +25,7 @@ import {
 } from "./parser.ts";
 import { descriptiveTitle, verseAt, verseByReference, type CorpusVerse } from "./corpus.ts";
 import { search } from "./search.ts";
-import { TITLED_PSALMS, DATA_VERSION } from "./data/meta.ts";
+import { TITLED_PSALMS } from "./data/meta.ts";
 
 /** Longest passage served in one response. */
 const MAX_PASSAGE_VERSES = 500;
@@ -73,34 +72,15 @@ const app = new Hono();
 
 app.use("*", cors({ origin: "*", allowMethods: ["GET", "OPTIONS"] }));
 
-/**
- * Edge cache for everything derived from the corpus.
- *
- * The cache name carries the corpus fingerprint, so regenerating the data
- * retires every previously cached response. Without that, the `immutable`
- * Cache-Control on verse data would keep serving the old text after a redeploy.
- *
- * Responses still cost a Worker invocation; what this saves is the CPU of
- * recomputing them, which matters most for search. The Cache API is absent in
- * some preview environments, so the middleware falls back to computing normally
- * and says so once rather than on every request.
+/*
+ * Caching is handled by the platform, not here. `[cache] enabled` in
+ * wrangler.toml puts a cache in front of the Worker, so a hit is served without
+ * running it at all — no CPU, where an in-Worker Cache API lookup still had to
+ * boot the isolate and execute. Deploying invalidates it automatically, which is
+ * what makes the `immutable` Cache-Control on verse data safe: new data cannot
+ * be masked by a stale entry. Responses set their own Cache-Control below, and
+ * that is what decides what gets stored.
  */
-let cacheWarningLogged = false;
-const edgeCache = cache({
-  cacheName: `bible-asv-${DATA_VERSION}`,
-  wait: false,
-  onCacheNotAvailable: (reason: unknown) => {
-    if (cacheWarningLogged) return;
-    cacheWarningLogged = true;
-    console.warn("Edge cache unavailable; serving uncached", { reason });
-  },
-});
-
-// /health is deliberately excluded: it reports liveness and must not be cached.
-app.use("/books", edgeCache);
-app.use("/books/*", edgeCache);
-app.use("/passages", edgeCache);
-app.use("/search", edgeCache);
 
 /* ------------------------------------------------------------------ *
  * Serializers

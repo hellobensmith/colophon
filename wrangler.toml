@@ -5,5 +5,11 @@ compatibility_date = "2026-09-02"
 # The ASV corpus is embedded in the bundle, so the Worker needs no bindings,
 # secrets, or network access at runtime.
 
+# Cache responses in front of the Worker. On a hit the Worker does not run at
+# all, so repeat traffic costs no CPU. Responses carry explicit Cache-Control,
+# which is what makes them storable.
+[cache]
+enabled = true
+
 [observability]
 enabled = true

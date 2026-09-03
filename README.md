@@ -23,8 +23,16 @@ than a laptop:
 | Requests | — | 100,000/day |
 
 The peak is the first search an isolate serves, which pays to decode the
-postings it touches. Everything after that runs in 0–4 ms, and repeat requests
-never reach the Worker at all — they are served from the edge cache.
+postings it touches. Everything after that runs in 0–4 ms.
+
+Repeat requests cost no CPU at all. `[cache] enabled` in `wrangler.toml` puts a
+cache in front of the Worker, so a hit is served without running it — measured at
+7 of 8 identical requests never reaching the Worker. Deploying invalidates that
+cache automatically, which is what makes the `immutable` header on verse data
+safe: new data cannot be masked by a stale entry.
+
+A cache hit still counts against the free plan's 100,000 requests/day, so
+requests, not CPU, are the limit you would reach first.
 
 This is a deliberate trade. The text was fixed in 1901 and will never change, so
 there are no writes, no concurrency, and nothing to grow into. A database would
