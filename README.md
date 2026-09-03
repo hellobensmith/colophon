@@ -207,9 +207,16 @@ twelve others come back with `text: ""` and a `note` explaining why:
 
 **Psalm superscriptions are real text.** "A Psalm of David, when he fled from
 Absalom his son" is verse 1 in the Hebrew Bible, though English Bibles print it
-as an unnumbered heading. 116 Psalms carry one, and so does Habakkuk 3. They are
-returned as `descriptive_title` on a chapter, and as verse 0 when you ask for
-Hebrew numbering.
+as an unnumbered heading. 116 Psalms carry one. They are returned as
+`descriptive_title` on a chapter, and as verse 0 when you ask for Hebrew
+numbering.
+
+Habakkuk 3 is the one chapter that closes with a line rather than opening with
+one: "For the Chief Musician, on my stringed instruments", printed below verse
+19. The source marks it with the same element as a superscription, so position
+is the only thing that distinguishes them. It is returned as `subscription`, and
+a parser that reads the element alone will either hang it above verse 1 as a
+heading or paste it onto the end of verse 19.
 
 This is what `?numbering=hebrew` is for. Psalm 23 has a title, so English verses
 1–6 are Hebrew verses 2–7:

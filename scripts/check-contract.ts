@@ -98,6 +98,7 @@ const SUCCESSES: readonly (readonly [string, string])[] = [
   ["/books/TOB", "/books/{id}"],
   ["/books/PSA/chapters/23", "/books/{id}/chapters/{num}"],
   ["/books/GEN/chapters/1", "/books/{id}/chapters/{num}"],
+  ["/books/HAB/chapters/3", "/books/{id}/chapters/{num}"],
   ["/passages?ref=John%203:16", "/passages"],
   ["/passages?ref=Matthew%2017:21", "/passages"],
   ["/passages?ref=Genesis%201:1-2:3", "/passages"],

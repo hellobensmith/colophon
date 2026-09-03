@@ -8,7 +8,7 @@
  */
 
 import { TEXT, LENGTHS, VERSE_COUNT } from "./data/text.ts";
-import { TITLES, NOTES } from "./data/meta.ts";
+import { TITLES, SUBSCRIPTIONS, NOTES } from "./data/meta.ts";
 import { locate, sequenceOf } from "./parser.ts";
 
 /** Decodes a base36 delta list into absolute values. */
@@ -77,7 +77,15 @@ export function verseByReference(book: string, chapter: number, verse: number): 
   return verseAt(sequenceOf(book, chapter, verse));
 }
 
-/** The `<d>` superscription for a chapter, if it has one. */
+/** The superscription printed above a chapter, if it has one. */
 export function descriptiveTitle(book: string, chapter: number): string | null {
   return TITLES[`${book}.${chapter}`] ?? null;
+}
+
+/**
+ * The line printed below a chapter's last verse, if it has one. Only Habakkuk 3
+ * has one in the ASV.
+ */
+export function subscription(book: string, chapter: number): string | null {
+  return SUBSCRIPTIONS[`${book}.${chapter}`] ?? null;
 }

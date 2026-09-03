@@ -2,11 +2,19 @@ import { describe, expect, test } from "bun:test";
 import {
   EXPECTED_BOOKS,
   EXPECTED_EMPTY_VERSES,
+  EXPECTED_SUBSCRIPTIONS,
   EXPECTED_TITLE_COUNT,
   EXPECTED_TOTAL_VERSES,
 } from "./validate.ts";
-import { VERSE_COUNTS, TITLES, NOTES, TITLED_PSALMS } from "./data/meta.ts";
-import { TOTAL_VERSES, textAt, verseAt, verseByReference, descriptiveTitle } from "./corpus.ts";
+import { VERSE_COUNTS, TITLES, SUBSCRIPTIONS, NOTES, TITLED_PSALMS } from "./data/meta.ts";
+import {
+  TOTAL_VERSES,
+  textAt,
+  verseAt,
+  verseByReference,
+  descriptiveTitle,
+  subscription,
+} from "./corpus.ts";
 import { sequenceOf, locate } from "./parser.ts";
 import { search } from "./search.ts";
 import { PROTESTANT_ORDER } from "./canon.ts";
@@ -60,15 +68,41 @@ describe("omitted verses", () => {
 });
 
 describe("descriptive titles", () => {
-  test("116 Psalm superscriptions plus Habakkuk 3", () => {
+  test("116 superscriptions, every one of them a Psalm", () => {
     expect(Object.keys(TITLES).length).toBe(EXPECTED_TITLE_COUNT);
     expect(TITLED_PSALMS.length).toBe(116);
-    expect(descriptiveTitle("HAB", 3)).toBeString();
+    for (const key of Object.keys(TITLES)) expect(key.startsWith("PSA.")).toBe(true);
   });
 
   test("Psalm 23 has one and Psalm 1 does not", () => {
     expect(descriptiveTitle("PSA", 23)).toBe("A Psalm of David.");
     expect(descriptiveTitle("PSA", 1)).toBeNull();
+  });
+
+  /**
+   * USFX marks a subscription with the same <d> element as a superscription, so
+   * a parser keying on the element alone files Habakkuk's closing line as a
+   * chapter heading — or, if it reads <d> as verse content, appends it to
+   * verse 19. Neither should happen.
+   */
+  test("Habakkuk 3's closing line is a subscription, not a heading", () => {
+    expect(Object.keys(SUBSCRIPTIONS)).toEqual([...EXPECTED_SUBSCRIPTIONS]);
+    expect(descriptiveTitle("HAB", 3)).toBeNull();
+    expect(subscription("HAB", 3)).toBe("For the Chief Musician, on my stringed instruments.");
+  });
+
+  test("the subscription never leaks into the surrounding verses", () => {
+    const last = verseByReference("HAB", 3, 19);
+    expect(last.text).toContain("walk upon my high places");
+    expect(last.text).not.toContain("Chief Musician");
+    // Habakkuk 3's own superscription is a numbered verse in the ASV.
+    expect(verseByReference("HAB", 3, 1).text).toBe(
+      "A prayer of Habakkuk the prophet, set to Shigionoth.",
+    );
+  });
+
+  test("no Psalm carries a subscription", () => {
+    for (const key of Object.keys(SUBSCRIPTIONS)) expect(key.startsWith("PSA.")).toBe(false);
   });
 });
 

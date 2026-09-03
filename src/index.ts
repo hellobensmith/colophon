@@ -23,7 +23,13 @@ import {
   verseCount,
   type ParseErrorKind,
 } from "./parser.ts";
-import { descriptiveTitle, verseAt, verseByReference, type CorpusVerse } from "./corpus.ts";
+import {
+  descriptiveTitle,
+  subscription,
+  verseAt,
+  verseByReference,
+  type CorpusVerse,
+} from "./corpus.ts";
 import { search } from "./search.ts";
 import { DEMO_HTML } from "./demo.ts";
 import { TITLED_PSALMS } from "./data/meta.ts";
@@ -208,6 +214,7 @@ app.get("/books/:id/chapters/:num", (context) => {
     book_id: id,
     chapter,
     descriptive_title: descriptiveTitle(id, chapter),
+    subscription: subscription(id, chapter),
     verses,
   });
 });

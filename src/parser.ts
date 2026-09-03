@@ -534,7 +534,7 @@ export function parseReference(
   }
 
   return {
-    reference: formatReference(book, segments, includeTitle, numbering),
+    reference: formatReference(book, segments, includeTitle, titleChapter, numbering),
     book,
     numbering,
     includeTitle,
@@ -568,10 +568,24 @@ function formatReference(
   book: string,
   segments: readonly RefSegment[],
   includeTitle: boolean,
+  titleChapter: number | null,
   numbering: Numbering,
 ): string {
   const name = displayName(book);
-  if (segments.length === 0) return `${name} (title)`;
+  const scheme =
+    numbering === "hebrew"
+      ? " (Hebrew numbering)"
+      : numbering === "greek"
+        ? " (Greek numbering)"
+        : "";
+
+  // A request that resolves to nothing but a superscription still has to say
+  // which chapter's superscription it is.
+  if (segments.length === 0) {
+    return titleChapter === null
+      ? `${name} title${scheme}`
+      : `${name} ${titleChapter} title${scheme}`;
+  }
 
   const parts: string[] = [];
   let lastChapter: number | null = null;
@@ -588,14 +602,8 @@ function formatReference(
     }
     lastChapter = end.chapter;
   }
-  const suffix =
-    numbering === "hebrew"
-      ? " (Hebrew numbering)"
-      : numbering === "greek"
-        ? " (Greek numbering)"
-        : "";
   const titleMark = includeTitle ? " with title" : "";
-  return `${name} ${parts.join(",")}${titleMark}${suffix}`;
+  return `${name} ${parts.join(",")}${titleMark}${scheme}`;
 }
 
 /**

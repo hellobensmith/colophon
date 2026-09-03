@@ -101,7 +101,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [id, book_id, chapter, descriptive_title, verses]
+                required: [id, book_id, chapter, descriptive_title, subscription, verses]
                 additionalProperties: false
                 properties:
                   id: { type: string, example: PSA.23 }
@@ -110,8 +110,15 @@ paths:
                   descriptive_title:
                     type: [string, "null"]
                     description: >
-                      The superscription printed above the chapter, present on 116
-                      Psalms and Habakkuk 3. Null elsewhere.
+                      The superscription printed above the chapter, as on 116 of
+                      the Psalms ("A Psalm of David."). Null elsewhere.
+                  subscription:
+                    type: [string, "null"]
+                    description: >
+                      A line printed below the chapter's last verse. Habakkuk 3
+                      is the only chapter in the ASV with one. The source marks
+                      it with the same element as a superscription, so the two
+                      are told apart by position, not markup.
                   verses:
                     type: array
                     items: { $ref: "#/components/schemas/ChapterVerse" }

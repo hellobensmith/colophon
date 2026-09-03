@@ -65,8 +65,18 @@ export const EXPECTED_EMPTY_VERSES: readonly string[] = [
   "ROM.16.24",
 ];
 
-/** Descriptive titles: 116 Psalm superscriptions plus Habakkuk 3. */
-export const EXPECTED_TITLE_COUNT = 117;
+/**
+ * The 116 Psalms carrying a superscription ("A Psalm of David.").
+ * Every `<d>` in the ASV outside these is the single Habakkuk 3 subscription.
+ */
+export const EXPECTED_TITLE_COUNT = 116;
+
+/**
+ * Habakkuk 3 closes with "For the Chief Musician, on my stringed instruments",
+ * printed below verse 19. It uses the same `<d>` element as a superscription,
+ * so a parser that keys on the element alone files it as a chapter heading.
+ */
+export const EXPECTED_SUBSCRIPTIONS: readonly string[] = ["HAB.3"];
 
 export class ValidationError extends Error {
   constructor(public readonly failures: readonly string[]) {
@@ -166,7 +176,18 @@ export function validateCorpus(doc: UsfxDocument): void {
 
   if (doc.titles.size !== EXPECTED_TITLE_COUNT) {
     failures.push(
-      `descriptive titles: expected ${EXPECTED_TITLE_COUNT}, got ${doc.titles.size}`,
+      `superscriptions: expected ${EXPECTED_TITLE_COUNT}, got ${doc.titles.size}`,
+    );
+  }
+  for (const key of doc.titles.keys()) {
+    if (!key.startsWith("PSA.")) {
+      failures.push(`${key}: superscription outside the Psalter`);
+    }
+  }
+  const subscriptions = [...doc.subscriptions.keys()].sort();
+  if (JSON.stringify(subscriptions) !== JSON.stringify([...EXPECTED_SUBSCRIPTIONS].sort())) {
+    failures.push(
+      `subscriptions: expected [${EXPECTED_SUBSCRIPTIONS.join(", ")}], got [${subscriptions.join(", ")}]`,
     );
   }
 

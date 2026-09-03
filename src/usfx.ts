@@ -29,8 +29,18 @@ export interface Verse {
 
 export interface UsfxDocument {
   readonly verses: readonly Verse[];
-  /** `<d>` descriptive titles keyed by "BOOK.CHAPTER" (Psalm superscriptions). */
+  /**
+   * `<d>` titles printed *above* a chapter, keyed by "BOOK.CHAPTER" — the
+   * superscriptions of the Psalms ("A Psalm of David.").
+   */
   readonly titles: ReadonlyMap<string, string>;
+  /**
+   * `<d>` lines printed *below* a chapter's last verse. USFX marks these with
+   * the same element as a superscription, so position is the only thing that
+   * separates them: Habakkuk 3 closes with "For the Chief Musician, on my
+   * stringed instruments", which belongs after verse 19, not above verse 1.
+   */
+  readonly subscriptions: ReadonlyMap<string, string>;
   /** Canonical book ids in document order, excluding front/back matter. */
   readonly books: readonly string[];
 }
@@ -87,16 +97,19 @@ export function parseUsfx(xml: string): UsfxDocument {
 
   const verses: MutableVerse[] = [];
   const titles = new Map<string, string>();
+  const subscriptions = new Map<string, string>();
   const books: string[] = [];
 
   let book = "";
   let chapter = 0;
+  let versesInChapter = 0;
   let current: MutableVerse | null = null;
 
   let discardDepth = 0;
   let footnoteDepth = 0;
   let footnoteRefDepth = 0;
   let titleBuffer: string | null = null;
+  let titleOpenedAfterVerses = false;
 
   const tokenizer =
     /<\/?([A-Za-z0-9]+)((?:\s+[A-Za-z0-9:_.-]+\s*=\s*"[^"]*")*)\s*(\/?)>|([^<]+)/g;
@@ -147,6 +160,7 @@ export function parseUsfx(xml: string): UsfxDocument {
           const id = attr(attrs, "id");
           book = id ?? "";
           chapter = 0;
+          versesInChapter = 0;
           if (book !== "" && !NON_SCRIPTURE.has(book) && !books.includes(book)) {
             books.push(book);
           }
@@ -163,6 +177,7 @@ export function parseUsfx(xml: string): UsfxDocument {
             throw new Error(`Chapter milestone without a numeric id in ${book}`);
           }
           chapter = parsed;
+          versesInChapter = 0;
         }
         current = null;
         continue;
@@ -171,12 +186,19 @@ export function parseUsfx(xml: string): UsfxDocument {
         if (isClosing || isSelfClosing) {
           if (titleBuffer !== null) {
             const title = collapse(titleBuffer);
-            if (title !== "") titles.set(`${book}.${chapter}`, title);
+            if (title !== "") {
+              // Position, not markup, decides which it is: a <d> reached before
+              // the chapter's first verse heads it; one reached afterwards
+              // closes it.
+              const target = titleOpenedAfterVerses ? subscriptions : titles;
+              target.set(`${book}.${chapter}`, title);
+            }
             titleBuffer = null;
           }
         } else {
           current = null;
           titleBuffer = "";
+          titleOpenedAfterVerses = versesInChapter > 0;
         }
         continue;
       }
@@ -194,6 +216,7 @@ export function parseUsfx(xml: string): UsfxDocument {
         if (Number.isNaN(chapterNumber) || Number.isNaN(verseNumber)) {
           throw new Error(`Non-numeric chapter or verse in identifier: ${bcv}`);
         }
+        versesInChapter += 1;
         current = {
           bcv,
           book: bookId,
@@ -226,6 +249,7 @@ export function parseUsfx(xml: string): UsfxDocument {
       note: collapse(verse.note) === "" ? null : collapse(verse.note),
     })),
     titles,
+    subscriptions,
     books,
   };
 }

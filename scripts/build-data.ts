@@ -188,6 +188,10 @@ function buildMetaModule(doc: UsfxDocument): string {
     .map(([key, title]) => `  ${JSON.stringify(key)}: ${JSON.stringify(title)},`)
     .join("\n");
 
+  const subscriptionsLiteral = [...doc.subscriptions.entries()]
+    .map(([key, text]) => `  ${JSON.stringify(key)}: ${JSON.stringify(text)},`)
+    .join("\n");
+
   const notesLiteral = doc.verses
     .filter((verse) => verse.note !== null)
     .map((verse) => `  ${JSON.stringify(verse.bcv)}: ${JSON.stringify(verse.note)},`)
@@ -209,9 +213,17 @@ export const VERSE_COUNTS: Readonly<Record<string, readonly number[]>> = {
 ${countsLiteral}
 };
 
-/** Descriptive titles (<d>) keyed by "BOOK.CHAPTER". */
+/** Superscriptions printed above a chapter, keyed by "BOOK.CHAPTER". */
 export const TITLES: Readonly<Record<string, string>> = {
 ${titlesLiteral}
+};
+
+/**
+ * Lines printed below a chapter's last verse. USFX marks these with the same
+ * <d> element as a superscription, so only position tells them apart.
+ */
+export const SUBSCRIPTIONS: Readonly<Record<string, string>> = {
+${subscriptionsLiteral}
 };
 
 /** Footnotes for the verses the ASV omits from its text. */

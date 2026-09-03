@@ -142,6 +142,16 @@ describe("numbering through the reference parser", () => {
     expect(descriptiveTitle("PSA", 9)).toBeString();
   });
 
+  test("a title-only reference still names its chapter", () => {
+    // Without the chapter this read "Psalms title", which is true of 116 psalms.
+    expect(parseReference("Psalm 23:1", { numbering: "hebrew" }).reference).toBe(
+      "Psalms 23 title (Hebrew numbering)",
+    );
+    expect(parseReference("Psalm 9:1", { numbering: "greek" }).reference).toBe(
+      "Psalms 9 title (Greek numbering)",
+    );
+  });
+
   test("Hebrew and Greek both stay confined to the Psalms", () => {
     expect(() => parseReference("John 3:16", { numbering: "greek" })).toThrow(
       /Greek numbering is only available for Psalms/,
