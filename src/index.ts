@@ -25,6 +25,7 @@ import {
 } from "./parser.ts";
 import { descriptiveTitle, verseAt, verseByReference, type CorpusVerse } from "./corpus.ts";
 import { search } from "./search.ts";
+import { DEMO_HTML } from "./demo.ts";
 import { TITLED_PSALMS } from "./data/meta.ts";
 
 /** Longest passage served in one response. */
@@ -123,6 +124,16 @@ function serializePassageVerse(verse: CorpusVerse) {
 /* ------------------------------------------------------------------ *
  * Endpoints
  * ------------------------------------------------------------------ */
+
+/**
+ * The demo page. Cached only briefly: the platform cache is invalidated by a
+ * deploy, but a browser's own cache is not, so a long max-age here would leave
+ * someone looking at a stale page after an update.
+ */
+app.get("/", (context) => {
+  context.header("Cache-Control", "public, max-age=300");
+  return context.html(DEMO_HTML);
+});
 
 app.get("/health", (context) => {
   context.header("Cache-Control", "no-store");
