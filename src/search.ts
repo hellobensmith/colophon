@@ -68,6 +68,56 @@ const AVERAGE_LENGTH: number = (() => {
   return total / WORD_LENGTHS.length;
 })();
 
+/** Base36 digit value, or -1. */
+function base36Digit(code: number): number {
+  if (code >= 48 && code <= 57) return code - 48;
+  if (code >= 97 && code <= 122) return code - 87;
+  return -1;
+}
+
+/**
+ * Adds up to `max` of a token's postings to `into`, decoding straight from the
+ * encoded line.
+ *
+ * Seeding a query never needs more postings than the scan cap allows, and a word
+ * like "the" carries far more than that. Going through {@link postingsAt} would
+ * decode all ~27,000 of them — and split the line into as many strings — to use
+ * six thousand. This walks the characters instead and stops at the cap.
+ *
+ * Returns how many were decoded, which is fewer than requested only when the
+ * token's list runs out first.
+ */
+function seedPostings(index: number, max: number, into: Set<number>): number {
+  if (max <= 0) return 0;
+  const cached = POSTINGS_CACHE[index];
+  if (cached !== undefined) {
+    const take = Math.min(cached.length, max);
+    for (let position = 0; position < take; position += 1) into.add(cached[position]!);
+    return take;
+  }
+
+  const line = LINES[index]!;
+  let cursor = line.indexOf(":") + 1;
+  let running = 0;
+  let count = 0;
+  while (cursor < line.length && count < max) {
+    let value = 0;
+    let digits = 0;
+    for (; cursor < line.length; cursor += 1) {
+      const digit = base36Digit(line.charCodeAt(cursor));
+      if (digit < 0) break;
+      value = value * 36 + digit;
+      digits += 1;
+    }
+    if (digits === 0) break;
+    cursor += 1; // skip the separator
+    running += value;
+    into.add(running);
+    count += 1;
+  }
+  return count;
+}
+
 function postingsAt(index: number): Int32Array {
   const cached = POSTINGS_CACHE[index];
   if (cached !== undefined) return cached;
@@ -214,12 +264,14 @@ export function search(query: string, limit: number, offset: number): SearchOutc
   let scanned = 0;
   const seed = new Set<number>();
   for (const tokenIndex of rarest.indices) {
-    const postings = postingsAt(tokenIndex);
-    const take = Math.min(postings.length, MAX_POSTINGS_SCANNED - scanned);
-    if (take < postings.length) truncated = true;
-    for (let position = 0; position < take; position += 1) seed.add(postings[position]!);
-    scanned += take;
-    if (scanned >= MAX_POSTINGS_SCANNED) break;
+    const budget = MAX_POSTINGS_SCANNED - scanned;
+    const decoded = seedPostings(tokenIndex, budget, seed);
+    scanned += decoded;
+    // Hitting the budget exactly means the list may well have continued.
+    if (decoded === budget) {
+      truncated = true;
+      break;
+    }
   }
 
   let candidates = [...seed];
