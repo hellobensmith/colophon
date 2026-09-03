@@ -18,13 +18,21 @@ const K1 = 1.2;
 const B = 0.75;
 
 /**
- * Ceiling on postings materialized for the most selective term. Cloudflare's
- * free plan allows 10 ms of CPU per request, and scanning the ~27,000 postings
- * of a word like "the" measured close to that on its own. Only a query whose
- * rarest term is itself very common can reach this cap, and it then reports
- * itself truncated.
+ * Ceiling on postings materialized for the most selective term.
+ *
+ * Cloudflare's free plan allows 10 ms of CPU per request. This figure is tuned
+ * against CPU measured on the deployed Worker rather than a laptop: production
+ * isolates ran roughly four times slower than local benchmarking suggested, and
+ * an earlier cap of 12,000 put "the" at 13 ms in production while local tests
+ * reported 3 ms.
+ *
+ * At 6,000 the only single words that truncate are function words — "the",
+ * "and", "of", "unto", "shall" — which carry almost no ranking signal anyway.
+ * Words that actually mean something stay exact: "Jehovah" (5,821 verses) is
+ * the most common of them and sits just inside the cap. Any query of two or
+ * more terms is exact regardless, since the rarest term seeds the search.
  */
-const MAX_POSTINGS_SCANNED = 12_000;
+const MAX_POSTINGS_SCANNED = 6_000;
 
 /** Ceiling on how many index terms one prefix wildcard may expand to. */
 const MAX_PREFIX_EXPANSIONS = 64;
@@ -222,9 +230,16 @@ export function search(query: string, limit: number, offset: number): SearchOutc
 
   if (candidates.length === 0) return { total: 0, hits: [], truncated };
 
-  // Every surviving verse contains every term, so the terms contribute equally
-  // and BM25's length normalization does the ordering: among verses that all
-  // match, the most concise ranks first.
+  // Every surviving verse contains every term, so the terms contribute the same
+  // total IDF to each. Only BM25's length normalization varies, and it falls
+  // monotonically with verse length — so the ranking is exactly "shortest verse
+  // containing all the terms, first".
+  //
+  // That means the order can be decided by an integer comparison on word count
+  // instead of a float comparison on a computed score, and the scores need only
+  // be worked out for the page actually returned. On a query like "the", which
+  // reaches the scan cap, that avoids allocating and sorting twelve thousand
+  // score tuples.
   const idfTotal = terms.reduce(
     (sum, term) =>
       sum +
@@ -232,21 +247,23 @@ export function search(query: string, limit: number, offset: number): SearchOutc
     0,
   );
 
-  const ranked = candidates
-    .map((document): readonly [number, number] => {
-      const length = WORD_LENGTHS[document]!;
-      const normalization = 1 + K1 * (1 - B + (B * length) / AVERAGE_LENGTH);
-      return [document, (idfTotal * (K1 + 1)) / normalization];
-    })
-    .sort((a, b) => (b[1] !== a[1] ? b[1] - a[1] : a[0] - b[0]));
+  candidates.sort((a, b) => {
+    const byLength = WORD_LENGTHS[a]! - WORD_LENGTHS[b]!;
+    return byLength !== 0 ? byLength : a - b;
+  });
 
-  const page = ranked.slice(offset, offset + limit);
+  const scoreOf = (document: number): number => {
+    const normalization = 1 + K1 * (1 - B + (B * WORD_LENGTHS[document]!) / AVERAGE_LENGTH);
+    return (idfTotal * (K1 + 1)) / normalization;
+  };
+
+  const page = candidates.slice(offset, offset + limit);
   return {
-    total: ranked.length,
+    total: candidates.length,
     truncated,
-    hits: page.map(([document, score]) => ({
+    hits: page.map((document) => ({
       ...verseAt(document + 1),
-      score: Math.round(score * 10_000) / 10_000,
+      score: Math.round(scoreOf(document) * 10_000) / 10_000,
     })),
   };
 }

@@ -13,7 +13,7 @@ never touches a database, a cache, or the network. Verse lookup is a string
 slice; search runs BM25 over an inverted index built at compile time.
 
 The bundle is 1.86 MB gzipped, against Cloudflare's 3 MB limit on the free plan.
-A search costs 1–2 ms of CPU, against a 10 ms budget.
+A search costs 2–7 ms of CPU on the deployed Worker, against a 10 ms budget.
 
 This is a deliberate trade. The text was fixed in 1901 and will never change, so
 there are no writes, no concurrency, and nothing to grow into. A database would
@@ -267,9 +267,12 @@ translation is actually wanted, rather than a wall.
 **Updating means redeploying.** Fine for a text fixed in 1901.
 
 **Very common single words are capped.** Searching `the` on its own scans the
-first 12,000 postings and sets `truncated: true`. Adding any second term makes
-the query exact again, because the rarer term seeds the search and the common one
-only filters it.
+first 6,000 postings and sets `truncated: true`. The cap is tuned against CPU
+measured on the deployed Worker, not locally — production isolates ran about four
+times slower than a laptop suggested. Only function words reach it: `the`, `and`,
+`of`, `unto`, `shall`. Every word that carries meaning stays exact, `Jehovah`
+(5,821 verses) included. Any query of two or more terms is exact regardless,
+since the rarest term seeds the search and the common one only filters it.
 
 **Search has no word sense.** Four tokens carry two meanings each and cannot be
 told apart without part-of-speech tagging: `lie` (recline / falsehood), `saw`
