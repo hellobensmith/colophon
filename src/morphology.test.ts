@@ -39,6 +39,28 @@ describe("archaic morphology", () => {
     expect(familyOf("fall")).not.toContain("felled");
   });
 
+  test("does not let a short -ing stem reach an unrelated real word", () => {
+    // Each of these was a real bug: the "-ing" rule produced a word that exists
+    // in the text but is not the lemma. "being" is not a bee.
+    expect(familyOf("bee")).not.toContain("being");
+    expect(familyOf("doe")).not.toContain("doing");
+    expect(familyOf("lye")).not.toContain("lying");
+    expect(familyOf("the")).not.toContain("thing");
+    expect(familyOf("thing")).not.toContain("the");
+
+    // ...while the irregular table still routes them to the right lemma.
+    expect(familyOf("being")).toContain("be");
+    expect(familyOf("doing")).toContain("do");
+    expect(familyOf("lying")).toContain("lie");
+  });
+
+  test("regular -ing forms are unaffected", () => {
+    expect(familyOf("make")).toContain("making");
+    expect(familyOf("walk")).toContain("walking");
+    expect(familyOf("give")).toContain("giving");
+    expect(familyOf("write")).toContain("writing");
+  });
+
   test("never merges a word into a lemma of the wrong length class", () => {
     for (const [member, family] of families) {
       expect(family).toContain(member);

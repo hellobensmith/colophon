@@ -228,11 +228,15 @@ app.get("/passages", (context) => {
   }
 
   const numberingParam = context.req.query("numbering") ?? "english";
-  if (numberingParam !== "english" && numberingParam !== "hebrew") {
+  if (
+    numberingParam !== "english" &&
+    numberingParam !== "hebrew" &&
+    numberingParam !== "greek"
+  ) {
     throw new HttpError(
       400,
       "bad_request",
-      `Unknown numbering "${numberingParam}". Use english or hebrew.`,
+      `Unknown numbering "${numberingParam}". Use english, hebrew, or greek.`,
     );
   }
 
@@ -248,7 +252,7 @@ app.get("/passages", (context) => {
 
   const verses = [];
   if (parsed.includeTitle) {
-    const chapter = parsed.segments[0]?.start.chapter ?? 1;
+    const chapter = parsed.titleChapter ?? parsed.segments[0]?.start.chapter ?? 1;
     const title = descriptiveTitle(parsed.book, chapter);
     if (title !== null) {
       verses.push({

@@ -6,10 +6,18 @@
  * versification, so "John 3:99" is rejected with the actual chapter length.
  */
 
-import { VERSE_COUNTS, TITLED_PSALMS } from "./data/meta.ts";
+import { VERSE_COUNTS } from "./data/meta.ts";
 import { BOOKS, PROTESTANT_ORDER } from "./canon.ts";
+import {
+  fromGreek,
+  fromHebrew,
+  greekVerseCount,
+  numberedVerses,
+  PsalmNumberingError,
+  type PsalmPosition,
+} from "./psalms.ts";
 
-export type Numbering = "english" | "hebrew";
+export type Numbering = "english" | "hebrew" | "greek";
 
 export interface VerseRef {
   readonly book: string;
@@ -31,6 +39,8 @@ export interface ParsedReference {
   readonly numbering: Numbering;
   /** True when a Hebrew-numbered request asks for a Psalm's superscription. */
   readonly includeTitle: boolean;
+  /** Psalm whose superscription `includeTitle` refers to. */
+  readonly titleChapter: number | null;
   readonly segments: readonly RefSegment[];
   readonly verseCount: number;
 }
@@ -80,8 +90,6 @@ const CHAPTER_OFFSET = new Map<string, readonly number[]>();
     running += withinBook;
   }
 }
-
-const TITLED_PSALM_SET: ReadonlySet<number> = new Set(TITLED_PSALMS);
 
 export function chapterCount(bookId: string): number {
   return VERSE_COUNTS[bookId]?.length ?? 0;
@@ -350,20 +358,35 @@ function toInteger(text: string, label: string): number {
 }
 
 /* ------------------------------------------------------------------ *
- * Hebrew numbering.
+ * Psalm numbering.
  * ------------------------------------------------------------------ */
 
 /**
- * Converts a Hebrew verse number to its English counterpart. For the 116 Psalms
- * carrying a superscription, that title is Hebrew verse 1, so every English
- * verse shifts up by one; verse 0 denotes the superscription itself.
+ * Resolves a psalm reference written in Hebrew or Greek numbering to its place
+ * in the ASV's English text. A Greek psalm may span two Hebrew ones, so the
+ * answer carries its own psalm number rather than assuming the input's.
  */
-function hebrewToEnglish(chapter: number, hebrewVerse: number): number {
-  return TITLED_PSALM_SET.has(chapter) ? hebrewVerse - 1 : hebrewVerse;
+function resolvePsalm(numbering: Numbering, psalm: number, verse: number): PsalmPosition {
+  try {
+    return numbering === "greek" ? fromGreek(psalm, verse) : fromHebrew(psalm, verse);
+  } catch (error) {
+    if (error instanceof PsalmNumberingError) {
+      throw new ParseError(error.message, "out_of_range");
+    }
+    throw error;
+  }
 }
 
-function hebrewVerseCount(chapter: number): number {
-  return verseCount("PSA", chapter) + (TITLED_PSALM_SET.has(chapter) ? 1 : 0);
+/** Verses a psalm has under the requested numbering, superscription included. */
+function psalmVerseCount(numbering: Numbering, psalm: number): number {
+  try {
+    return numbering === "greek" ? greekVerseCount(psalm) : numberedVerses(psalm);
+  } catch (error) {
+    if (error instanceof PsalmNumberingError) {
+      throw new ParseError(error.message, "out_of_range");
+    }
+    throw error;
+  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -397,10 +420,11 @@ export function parseReference(
 
   const book = resolveBook(bookPart);
 
-  if (numbering === "hebrew" && book !== "PSA") {
+  if (numbering !== "english" && book !== "PSA") {
+    const scheme = numbering === "greek" ? "Greek" : "Hebrew";
     throw new ParseError(
-      "Hebrew numbering is only available for Psalms; " +
-        `${displayName(book)} uses a single verse numbering`,
+      `${scheme} numbering is only available for Psalms; ` +
+        `${displayName(book)} is numbered the same way in every tradition`,
     );
   }
 
@@ -414,6 +438,7 @@ export function parseReference(
       : parseSegments(numericPart, singleChapterBook);
 
   let includeTitle = false;
+  let titleChapter: number | null = null;
   const segments: RefSegment[] = [];
 
   for (const raw of rawSegments) {
@@ -422,26 +447,57 @@ export function parseReference(
     validateChapter(book, startChapter);
     validateChapter(book, endChapter);
 
+
     let startVerse: number;
     let endVerse: number;
 
-    if (numbering === "hebrew") {
-      const hebrewStart = raw.startVerse ?? 1;
-      const hebrewEnd = raw.endVerse ?? hebrewVerseCount(endChapter);
-      validateHebrewVerse(startChapter, hebrewStart);
-      validateHebrewVerse(endChapter, hebrewEnd);
-      startVerse = hebrewToEnglish(startChapter, hebrewStart);
-      endVerse = hebrewToEnglish(endChapter, hebrewEnd);
-      if (startVerse === 0) {
+    if (numbering !== "english") {
+      const start = resolvePsalm(numbering, startChapter, raw.startVerse ?? 1);
+      const end = resolvePsalm(
+        numbering,
+        endChapter,
+        raw.endVerse ?? psalmVerseCount(numbering, endChapter),
+      );
+
+      if (start.kind === "title") {
         includeTitle = true;
-        startVerse = 1;
+        titleChapter = start.psalm;
       }
-      if (endVerse === 0) {
-        // The range covers only the superscription.
+      // A range that ends on a superscription covers nothing but that title.
+      if (end.kind === "title") {
         includeTitle = true;
+        titleChapter = end.psalm;
         continue;
       }
-    } else {
+
+      // Greek numbering can move the psalm as well as the verse, so the
+      // English chapter comes from the resolved position, not the input.
+      const startPsalm = start.psalm;
+      const startEnglishVerse = start.kind === "title" ? 1 : start.verse;
+      const startRef: VerseRef = {
+        book,
+        chapter: startPsalm,
+        verse: startEnglishVerse,
+        sequence: sequenceOf(book, startPsalm, startEnglishVerse),
+      };
+      const endRef: VerseRef = {
+        book,
+        chapter: end.psalm,
+        verse: end.verse,
+        sequence: sequenceOf(book, end.psalm, end.verse),
+      };
+      if (endRef.sequence < startRef.sequence) {
+        throw new ParseError(
+          `Reference range runs backwards: Psalm ${startChapter}:${raw.startVerse ?? 1}` +
+            ` is after ${endChapter}:${raw.endVerse ?? ""}`,
+          "syntax",
+        );
+      }
+      segments.push({ start: startRef, end: endRef });
+      continue;
+    }
+
+    {
       startVerse = raw.startVerse ?? 1;
       endVerse = raw.endVerse ?? verseCount(book, endChapter);
       validateVerse(book, startChapter, startVerse);
@@ -482,6 +538,7 @@ export function parseReference(
     book,
     numbering,
     includeTitle,
+    titleChapter,
     segments,
     verseCount: verseTotal,
   };
@@ -502,16 +559,6 @@ function validateVerse(book: string, chapter: number, verse: number): void {
   if (verse < 1 || verse > total) {
     throw new ParseError(
       `${displayName(book)} ${chapter} only has ${total} verses`,
-      "out_of_range",
-    );
-  }
-}
-
-function validateHebrewVerse(chapter: number, verse: number): void {
-  const total = hebrewVerseCount(chapter);
-  if (verse < 1 || verse > total) {
-    throw new ParseError(
-      `Psalm ${chapter} only has ${total} verses in Hebrew numbering`,
       "out_of_range",
     );
   }
@@ -541,7 +588,12 @@ function formatReference(
     }
     lastChapter = end.chapter;
   }
-  const suffix = numbering === "hebrew" ? " (Hebrew numbering)" : "";
+  const suffix =
+    numbering === "hebrew"
+      ? " (Hebrew numbering)"
+      : numbering === "greek"
+        ? " (Greek numbering)"
+        : "";
   const titleMark = includeTitle ? " with title" : "";
   return `${name} ${parts.join(",")}${titleMark}${suffix}`;
 }

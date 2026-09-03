@@ -27,6 +27,8 @@ const IRREGULAR: ReadonlyMap<string, string> = new Map([
   ["art", "be"], ["are", "be"], ["is", "be"],
   ["hath", "have"], ["hast", "have"], ["had", "have"], ["hadst", "have"],
   ["doeth", "do"], ["doth", "do"], ["dost", "do"], ["did", "do"], ["didst", "do"], ["done", "do"],
+  ["doest", "do"], ["doing", "do"], ["doings", "do"],
+  ["being", "be"], ["lying", "lie"],
   // Motion.
   ["went", "go"], ["gone", "go"], ["goeth", "go"], ["goest", "go"],
   ["came", "come"], ["cometh", "come"], ["comest", "come"],
@@ -110,8 +112,15 @@ function candidateRoots(token: string): string[] {
     add(token.slice(0, -3));       // walkest -> walk
   }
   if (token.endsWith("ing")) {
-    add(`${token.slice(0, -3)}e`); // making  -> make
-    add(token.slice(0, -3));       // walking -> walk
+    // The stem itself must be substantial. Without this, "being" reaches "bee",
+    // "doing" reaches "doe", "lying" reaches "lye" and "thing" reaches "the" —
+    // every one a real word, and every one the wrong lemma. Verbs whose stem is
+    // genuinely two letters are handled by the irregular table instead.
+    const stem = token.slice(0, -3);
+    if (stem.length >= 3) {
+      add(`${stem}e`);             // making  -> make
+      add(stem);                   // walking -> walk
+    }
   }
   if (token.endsWith("ed")) {
     add(token.slice(0, -1));       // loved  -> love

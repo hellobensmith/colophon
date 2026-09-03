@@ -201,6 +201,45 @@ curl 'localhost:8787/passages?ref=Psalm+23:1-2&numbering=hebrew'
 # verse 1: "Jehovah is my shepherd; I shall not want."
 ```
 
+## The two Psalters
+
+Catholic and Orthodox sources number the Psalms as the Septuagint and Vulgate do,
+which is not how the ASV numbers them. "Psalm 50" in a patristic citation or a
+liturgical text is the *Miserere* — printed here as Psalm 51.
+
+The divergence is not a constant offset. Two psalms merge, two split:
+
+| Greek | Hebrew |
+| --- | --- |
+| 1–8 | 1–8 |
+| **9** | **9 + 10** |
+| 10–112 | 11–113 |
+| **113** | **114 + 115** |
+| **114** | **116:1–9** |
+| **115** | **116:10–19** |
+| 116–145 | 117–146 |
+| **146** | **147:1–11** |
+| **147** | **147:12–20** |
+| 148–150 | 148–150 |
+
+`?numbering=greek` handles all of it, including verse positions inside the merged
+and split psalms:
+
+```bash
+curl 'localhost:8787/passages?ref=Psalm+50:2&numbering=greek'
+# Psalm 51:1 — "Have mercy upon me, O God"
+
+curl 'localhost:8787/passages?ref=Psalm+115:1&numbering=greek'
+# Psalm 116:10 — "I believe, for I will speak", the Vulgate's Credidi
+
+curl 'localhost:8787/passages?ref=Psalm+9:21-22&numbering=greek'
+# crosses from Hebrew 9:20 into Hebrew 10:1 inside a single Greek psalm
+```
+
+The mapping is verified as a bijection: all 150 Greek psalms resolve to exactly
+2,577 distinct positions — the Psalter's 2,461 verses plus its 116
+superscriptions, each reached once and only once.
+
 The divine name is preserved as the ASV printed it: **Jehovah**, 6,887 times,
 where most English Bibles substitute "the LORD".
 
@@ -215,16 +254,15 @@ provision, and nothing to configure — the data is in the bundle.
 
 ## Limitations
 
-**Hebrew numbering handles the simple case only.** A single per-verse offset
-covers the 116 Psalms whose superscription shifts the count. It cannot express
-the places where the Hebrew and Greek Psalters divide the text differently:
-Psalms 9/10 are one psalm in Hebrew, as are 114/115, while 116 and 147 each
-split in two. Those are genuine structural differences, not offsets, and they
-are left for a later version.
+**One translation — but not because of the size limit.** A second would fit. The
+inverted index is 0.65 MB of the 1.86 MB bundle, and rebuilding it at startup
+from the text instead of shipping it costs a measured 180 ms against a 1,000 ms
+startup budget. That drops the payload to ~1.20 MB per translation, so two would
+land near 2.39 MB, inside the 3 MB free-tier limit.
 
-**One translation.** A second would roughly double the bundle and push past the
-3 MB free-tier limit. At that point the data belongs in KV, static assets, or D1
-rather than the bundle.
+That trade is not made here, because it would add 180 ms to every cold isolate
+for no present benefit. It is a known, measured option for whenever a second
+translation is actually wanted, rather than a wall.
 
 **Updating means redeploying.** Fine for a text fixed in 1901.
 
@@ -233,9 +271,12 @@ first 12,000 postings and sets `truncated: true`. Adding any second term makes
 the query exact again, because the rarer term seeds the search and the common one
 only filters it.
 
-**Search has no word sense.** "Lie" (recline) and "lie" (falsehood) share a
-family, as do the two senses of "saw". Separating them would need part-of-speech
-tagging.
+**Search has no word sense.** Four tokens carry two meanings each and cannot be
+told apart without part-of-speech tagging: `lie` (recline / falsehood), `saw`
+(tool / past of see), `found` (past of find / to establish), and `bear` (carry /
+the animal). This is irreducible — the two senses are the same string. What *was*
+fixable has been fixed: the rules no longer merge `being` into "bee", `doing`
+into "doe", `lying` into "lye", or `thing` into "the".
 
 **Author and date fields are traditional ascriptions**, not critical judgements.
 "Moses" for the Pentateuch is what the tradition says, and the date ranges are

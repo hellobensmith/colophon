@@ -142,13 +142,21 @@ paths:
         - name: numbering
           in: query
           required: false
-          description: >
-            Hebrew numbering is valid for Psalms only. On the 116 Psalms that
-            carry a superscription, that title is Hebrew verse 1 and every
-            English verse shifts up by one; the title is returned as verse 0.
+          description: |
+            Psalms only; every other book is numbered alike in all traditions.
+
+            `hebrew` follows the Masoretic text, where a psalm's superscription
+            is verse 1, so every English verse shifts up by one on the 116 Psalms
+            that carry one. The superscription itself is returned as verse 0.
+
+            `greek` follows the Septuagint and Vulgate, as Catholic and Orthodox
+            sources cite them. This changes the psalm number as well as the
+            verses, and not by a constant: Greek 9 is Hebrew 9 and 10 together,
+            Greek 113 is Hebrew 114 and 115, while Hebrew 116 and 147 each split
+            in two. So Greek 50 is the Miserere, printed here as Psalm 51.
           schema:
             type: string
-            enum: [english, hebrew]
+            enum: [english, hebrew, greek]
             default: english
       responses:
         "200":
@@ -165,7 +173,7 @@ paths:
                     description: The reference normalized for display.
                     example: 1 Corinthians 13:4-7,13
                   translation: { $ref: "#/components/schemas/Translation" }
-                  numbering: { type: string, enum: [english, hebrew] }
+                  numbering: { type: string, enum: [english, hebrew, greek] }
                   verses:
                     type: array
                     items: { $ref: "#/components/schemas/PassageVerse" }
