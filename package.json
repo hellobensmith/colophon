@@ -1,0 +1,23 @@
+{
+  "name": "bible-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:data": "bun scripts/build-data.ts",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "check:contract": "bun scripts/check-contract.ts"
+  },
+  "dependencies": {
+    "hono": "4.13.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "@types/bun": "^1.4.0",
+    "typescript": "7.0.2",
+    "wrangler": "4.128.0"
+  }
+}

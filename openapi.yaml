@@ -1,0 +1,365 @@
+openapi: 3.1.0
+info:
+  title: Canon-Aware Bible API
+  version: 1.0.0
+  description: |
+    The complete American Standard Version (1901), public domain, served from
+    Cloudflare Workers. The corpus is embedded in the Worker, so no request
+    performs any I/O.
+
+    Canon awareness: every book carries its position in the Protestant (66),
+    Catholic (73), and Orthodox Greek (76) canons. The ASV contains no
+    deuterocanonical text, so those books are present as metadata only.
+  license:
+    name: Public Domain
+    url: https://ebible.org/asv/
+
+servers:
+  - url: https://bible-api.workers.dev
+
+paths:
+  /health:
+    get:
+      summary: Service health
+      responses:
+        "200":
+          description: Service is up.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, database, timestamp]
+                additionalProperties: false
+                properties:
+                  status: { type: string, enum: [ok] }
+                  database:
+                    type: string
+                    enum: [embedded]
+                    description: The corpus ships inside the Worker; there is no external store.
+                  timestamp: { type: string, format: date-time }
+
+  /books:
+    get:
+      summary: List books in a canon's order
+      parameters:
+        - name: tradition
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [protestant, catholic, orthodox_greek]
+            default: protestant
+      responses:
+        "200":
+          description: Books ordered by their position in the requested tradition.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tradition, translation, books]
+                additionalProperties: false
+                properties:
+                  tradition: { type: string, enum: [protestant, catholic, orthodox_greek] }
+                  translation: { $ref: "#/components/schemas/Translation" }
+                  books:
+                    type: array
+                    items: { $ref: "#/components/schemas/Book" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /books/{id}:
+    get:
+      summary: A single book
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, example: JHN }
+      responses:
+        "200":
+          description: Book metadata.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Book" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /books/{id}/chapters/{num}:
+    get:
+      summary: One chapter, in full
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, example: PSA }
+        - name: num
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1, example: 23 }
+      responses:
+        "200":
+          description: Every verse of the chapter.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, book_id, chapter, descriptive_title, verses]
+                additionalProperties: false
+                properties:
+                  id: { type: string, example: PSA.23 }
+                  book_id: { type: string, example: PSA }
+                  chapter: { type: integer }
+                  descriptive_title:
+                    type: [string, "null"]
+                    description: >
+                      The superscription printed above the chapter, present on 116
+                      Psalms and Habakkuk 3. Null elsewhere.
+                  verses:
+                    type: array
+                    items: { $ref: "#/components/schemas/ChapterVerse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /passages:
+    get:
+      summary: Resolve a natural-language reference
+      description: |
+        Accepts references such as `John 3:16`, `1 Cor 13:4-7,13`,
+        `Genesis 1:1-2:3`, `Jude 5`, or a bare book name. Ambiguous
+        abbreviations are rejected: `Jo` could mean Job, Joel, John, Jonah, or
+        Joshua.
+
+        A one-chapter book takes either form: `Jude 5` and `Jude 1:5` both
+        resolve, as do `2 John 10` and `2 John 1:10`.
+
+        Errors divide by cause. Input that cannot be understood is a 400;
+        a reference that is well formed but names something absent — an unknown
+        book, or a chapter or verse past the end — is a 404, matching what the
+        `/books` endpoints return for the same condition.
+      parameters:
+        - name: ref
+          in: query
+          required: true
+          schema: { type: string, example: "John 3:16" }
+        - name: numbering
+          in: query
+          required: false
+          description: >
+            Hebrew numbering is valid for Psalms only. On the 116 Psalms that
+            carry a superscription, that title is Hebrew verse 1 and every
+            English verse shifts up by one; the title is returned as verse 0.
+          schema:
+            type: string
+            enum: [english, hebrew]
+            default: english
+      responses:
+        "200":
+          description: The verses the reference selects.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reference, translation, numbering, verses]
+                additionalProperties: false
+                properties:
+                  reference:
+                    type: string
+                    description: The reference normalized for display.
+                    example: 1 Corinthians 13:4-7,13
+                  translation: { $ref: "#/components/schemas/Translation" }
+                  numbering: { type: string, enum: [english, hebrew] }
+                  verses:
+                    type: array
+                    items: { $ref: "#/components/schemas/PassageVerse" }
+        "400":
+          description: >
+            The reference could not be understood: malformed syntax, or an
+            abbreviation ambiguous enough to match several books.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: >
+            The reference was understood but names something absent: an unknown
+            book, a deuterocanonical book the ASV does not contain, or a chapter
+            or verse beyond the end of the book.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "413":
+          description: The reference covers more than 500 verses.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /search:
+    get:
+      summary: Ranked full-text search
+      description: |
+        BM25 ranking over an inverted index of all 31,102 verses.
+
+        A verse must contain **every** term to match, so `total` is the number of
+        verses containing all of them — not the number containing any.
+
+        Each term matches more than its literal spelling. Words are grouped into
+        morphological families, so `speak` also finds `spake` and `spoken`, and
+        `say` also finds `said` and `saith` — forms no prefix rule could reach,
+        and among the most common words in this translation. The final term
+        additionally matches by prefix, so `believet` finds `believeth`.
+
+        Ranking: every result contains every term, so BM25's length
+        normalization orders them, putting the most concise matching verse first.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 2, example: good shepherd }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        "200":
+          description: Ranked matches, best first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [query, total, limit, offset, truncated, translation, results]
+                additionalProperties: false
+                properties:
+                  query: { type: string }
+                  total: { type: integer }
+                  limit: { type: integer }
+                  offset: { type: integer }
+                  truncated:
+                    type: boolean
+                    description: >
+                      True when the query's most selective term was itself common
+                      enough to hit the scan cap, leaving `total` a lower bound.
+                      Only single very common words normally reach this; adding a
+                      second term makes the query exact again.
+                  translation: { $ref: "#/components/schemas/Translation" }
+                  results:
+                    type: array
+                    items: { $ref: "#/components/schemas/SearchResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+components:
+  responses:
+    BadRequest:
+      description: The request was malformed; `detail` says how.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: No such resource.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      required: [error, detail]
+      additionalProperties: false
+      properties:
+        error:
+          type: string
+          enum: [bad_request, not_found, payload_too_large, internal_error]
+        detail: { type: string }
+
+    Translation:
+      type: object
+      required: [id, name, language, license, year]
+      additionalProperties: false
+      properties:
+        id: { type: string, enum: [asv] }
+        name: { type: string }
+        language: { type: string }
+        license: { type: string }
+        year: { type: integer }
+
+    Book:
+      type: object
+      required:
+        [id, name, testament, is_deuterocanon, chapters_count, author, genre,
+         approximate_date, data_availability, canons]
+      additionalProperties: false
+      properties:
+        id: { type: string, example: JHN }
+        name: { type: string, example: John }
+        testament: { type: string, enum: [OT, NT] }
+        is_deuterocanon: { type: boolean }
+        chapters_count:
+          type: integer
+          description: Zero for deuterocanonical books, which carry no text here.
+        author:
+          type: string
+          description: >
+            The traditional ascription, not a critical judgement — "Moses" for the
+            Pentateuch, "Ezra" for Chronicles. Catalogue metadata.
+        genre: { type: string }
+        approximate_date:
+          type: string
+          description: >
+            A broad range spanning the composition debate rather than settling it.
+        data_availability:
+          type: string
+          enum: [full, metadata_only]
+        canons:
+          type: object
+          required: [protestant, catholic, orthodox_greek]
+          additionalProperties: false
+          description: 1-based position in each canon, or null if absent from it.
+          properties:
+            protestant: { type: [integer, "null"] }
+            catholic: { type: [integer, "null"] }
+            orthodox_greek: { type: [integer, "null"] }
+
+    ChapterVerse:
+      type: object
+      required: [id, number, text, hebrew_numbering, note]
+      additionalProperties: false
+      properties:
+        id: { type: string, example: PSA.23.1 }
+        number: { type: integer }
+        text: { type: string }
+        hebrew_numbering:
+          type: integer
+          description: >
+            The verse's number in Hebrew reckoning. Differs from `number` only
+            on the 116 Psalms carrying a superscription.
+        note:
+          type: [string, "null"]
+          description: >
+            Present on the 16 verses the ASV omits, which appear as numbered
+            placeholders with empty text and this explanatory footnote.
+
+    PassageVerse:
+      type: object
+      required: [id, book, chapter, verse, text, note]
+      additionalProperties: false
+      properties:
+        id: { type: string, example: JHN.3.16 }
+        book: { type: string, example: JHN }
+        chapter: { type: integer }
+        verse:
+          type: integer
+          description: >
+            Zero denotes a Psalm superscription, returned when Hebrew numbering
+            selects verse 1 of a titled Psalm.
+        text: { type: string }
+        note: { type: [string, "null"] }
+
+    SearchResult:
+      type: object
+      required: [id, book, chapter, verse, text, score]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        book: { type: string }
+        chapter: { type: integer }
+        verse: { type: integer }
+        text: { type: string }
+        score: { type: number, description: BM25 relevance; higher is better. }
