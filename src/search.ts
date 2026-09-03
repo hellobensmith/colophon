@@ -12,7 +12,7 @@
 
 import { INDEX, WORD_COUNTS, TOKEN_COUNT } from "./data/search-index.ts";
 import { decodeDeltas, TOTAL_VERSES, verseAt, type CorpusVerse } from "./corpus.ts";
-import { buildFamilies } from "./morphology.ts";
+import { FAMILY_GROUPS } from "./data/families.ts";
 
 const K1 = 1.2;
 const B = 0.75;
@@ -57,10 +57,20 @@ const WORD_LENGTHS: Int32Array = decodeDeltas(WORD_COUNTS, TOTAL_VERSES);
 
 /**
  * Surface forms grouped by lemma, so "speak" reaches "spake" and "say" reaches
- * "said". Computed from the vocabulary at startup rather than shipped, which
- * costs about 13 ms of the one-second startup budget and nothing in bundle size.
+ * "said".
+ *
+ * Derived at build time rather than here. Computing the families from the
+ * vocabulary on every isolate start measured 14 ms locally and several times
+ * that in production, against a bundle cost of 14 KB for shipping them.
  */
-const FAMILIES: ReadonlyMap<string, readonly string[]> = buildFamilies(TOKENS);
+const FAMILIES: ReadonlyMap<string, readonly string[]> = (() => {
+  const lookup = new Map<string, readonly string[]>();
+  for (const line of FAMILY_GROUPS.split("\n")) {
+    const family = line.split(",");
+    for (const member of family) lookup.set(member, family);
+  }
+  return lookup;
+})();
 
 const AVERAGE_LENGTH: number = (() => {
   let total = 0;
