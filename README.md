@@ -12,8 +12,19 @@ The whole Bible — 31,102 verses — is compiled into the Worker itself. A requ
 never touches a database, a cache, or the network. Verse lookup is a string
 slice; search runs BM25 over an inverted index built at compile time.
 
-The bundle is 1.86 MB gzipped, against Cloudflare's 3 MB limit on the free plan.
-A search costs 2–7 ms of CPU on the deployed Worker, against a 10 ms budget.
+Everything fits Cloudflare's free plan, measured on the deployed Worker rather
+than a laptop:
+
+| | Measured | Free-plan limit |
+| --- | --- | --- |
+| Bundle | 1.93 MB gzip | 3 MB |
+| CPU per request | 4 ms median, 8 ms peak | 10 ms |
+| Worker startup | ~53 ms | 1,000 ms |
+| Requests | — | 100,000/day |
+
+The peak is the first search an isolate serves, which pays to decode the
+postings it touches. Everything after that runs in 0–4 ms, and repeat requests
+never reach the Worker at all — they are served from the edge cache.
 
 This is a deliberate trade. The text was fixed in 1901 and will never change, so
 there are no writes, no concurrency, and nothing to grow into. A database would
