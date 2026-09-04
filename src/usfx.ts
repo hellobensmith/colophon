@@ -17,6 +17,25 @@ const DISCARD = new Set(["x", "xo", "xt", "xk", "xq"]);
 /** Elements inside a footnote whose text is the caller/reference, not prose. */
 const FOOTNOTE_REF = new Set(["fr", "fk", "fv"]);
 
+/**
+ * Closes a bracket this edition opens and never shuts.
+ *
+ * Every `<qs>` marker in the file reads `[Selah` — 78 opening brackets against
+ * four closing ones, and none of those four belong to a Selah. Left alone the
+ * text renders "...no help for him in God. [Selah", which reads as a defect.
+ *
+ * The repair is confined to `<qs>` on purpose. The ASV also brackets the
+ * passage at John 7:53-8:11 to mark its disputed manuscript standing, and that
+ * bracket legitimately opens in one verse and closes thirteen verses later. A
+ * parser that balanced brackets per verse would corrupt real textual apparatus
+ * to fix a markup artifact.
+ */
+function closeSelahBracket(text: string): string {
+  const opens = (text.match(/\[/g) ?? []).length;
+  const closes = (text.match(/\]/g) ?? []).length;
+  return opens > closes ? `${text}${"]".repeat(opens - closes)}` : text;
+}
+
 export interface Verse {
   readonly bcv: string;
   readonly book: string;
@@ -110,6 +129,7 @@ export function parseUsfx(xml: string): UsfxDocument {
   let footnoteRefDepth = 0;
   let titleBuffer: string | null = null;
   let titleOpenedAfterVerses = false;
+  let selahBuffer: string | null = null;
 
   const tokenizer =
     /<\/?([A-Za-z0-9]+)((?:\s+[A-Za-z0-9:_.-]+\s*=\s*"[^"]*")*)\s*(\/?)>|([^<]+)/g;
@@ -122,6 +142,8 @@ export function parseUsfx(xml: string): UsfxDocument {
       const decoded = decodeEntities(textRun);
       if (footnoteDepth > 0) {
         if (current !== null) current.note += decoded;
+      } else if (selahBuffer !== null) {
+        selahBuffer += decoded;
       } else if (titleBuffer !== null) {
         titleBuffer += decoded;
       } else if (current !== null) {
@@ -199,6 +221,18 @@ export function parseUsfx(xml: string): UsfxDocument {
           current = null;
           titleBuffer = "";
           titleOpenedAfterVerses = versesInChapter > 0;
+        }
+        continue;
+      }
+      case "qs": {
+        if (isClosing) {
+          if (selahBuffer !== null) {
+            const marker = closeSelahBracket(collapse(selahBuffer));
+            if (current !== null) current.text += marker;
+            selahBuffer = null;
+          }
+        } else if (!isSelfClosing) {
+          selahBuffer = "";
         }
         continue;
       }

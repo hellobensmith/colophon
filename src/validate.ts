@@ -191,6 +191,29 @@ export function validateCorpus(doc: UsfxDocument): void {
     );
   }
 
+  // Selah markers must read "[Selah]"; the only brackets left open are the two
+  // ends of the disputed passage at John 7:53-8:11, which span 13 verses.
+  const unbalanced = doc.verses
+    .filter((verse) => {
+      const opens = (verse.text.match(/\[/g) ?? []).length;
+      const closes = (verse.text.match(/\]/g) ?? []).length;
+      return opens !== closes;
+    })
+    .map((verse) => verse.bcv)
+    .sort();
+  const expectedUnbalanced = ["JHN.7.53", "JHN.8.11"];
+  if (JSON.stringify(unbalanced) !== JSON.stringify(expectedUnbalanced)) {
+    failures.push(
+      `unbalanced brackets: expected only [${expectedUnbalanced.join(", ")}], got [${unbalanced.join(", ")}]`,
+    );
+  }
+  const openSelah = doc.verses.filter((verse) => /\[(Selah|Higgaion)[^\]]*$/.test(verse.text));
+  if (openSelah.length > 0) {
+    failures.push(
+      `${openSelah.length} Selah marker(s) left unclosed, e.g. ${openSelah[0]?.bcv ?? ""}`,
+    );
+  }
+
   const withMarkup = doc.verses.filter((verse) => /[<>]/.test(verse.text));
   if (withMarkup.length > 0) {
     failures.push(

@@ -190,7 +190,7 @@ metadata only — you get their canon positions, authorship, and date, and
 `data_availability: "metadata_only"`. Asking for their text returns 404, which
 is honest rather than empty.
 
-## Two things about the text
+## Three things about the text
 
 **Sixteen verses are empty on purpose.** The ASV omits verses its translators
 judged absent from the earliest manuscripts, but keeps the numbering so
@@ -204,6 +204,17 @@ twelve others come back with `text: ""` and a `note` explaining why:
   "note": "Many authorities, some ancient, insert v. 21. But this kind goeth not out save by prayer and fasting. See Mrk 9:29."
 }
 ```
+
+**Selah is bracketed, and the bracket is repaired.** Every `<qs>` marker in the
+source reads `[Selah` with no closing bracket — 78 opening brackets in the file
+against four closing ones, none of which belong to a Selah. The API closes it, so
+the text reads `[Selah]`.
+
+That repair is deliberately confined to the Selah markers. The ASV also brackets
+John 7:53–8:11 to mark that passage's disputed manuscript standing, and *that*
+bracket opens in one verse and closes thirteen verses later. Balancing brackets
+verse by verse would have corrupted real textual apparatus in order to tidy a
+markup artifact, so those two verses are left exactly as printed.
 
 **Psalm superscriptions are real text.** "A Psalm of David, when he fled from
 Absalom his son" is verse 1 in the Hebrew Bible, though English Bibles print it
@@ -300,12 +311,22 @@ times slower than a laptop suggested. Only function words reach it: `the`, `and`
 (5,821 verses) included. Any query of two or more terms is exact regardless,
 since the rarest term seeds the search and the common one only filters it.
 
-**Search has no word sense.** Four tokens carry two meanings each and cannot be
-told apart without part-of-speech tagging: `lie` (recline / falsehood), `saw`
-(tool / past of see), `found` (past of find / to establish), and `bear` (carry /
-the animal). This is irreducible — the two senses are the same string. What *was*
-fixable has been fixed: the rules no longer merge `being` into "bee", `doing`
-into "doe", `lying` into "lye", or `thing` into "the".
+**Search has no word sense.** Four tokens carry two meanings each: `lie`
+(recline / falsehood), `saw` (tool / past of see), `found` (past of find / to
+establish), and `bear` (carry / the animal). The two senses are the same string,
+so no morphology can separate them.
+
+Ranking literal matches above family relatives was tried and rejected. It works
+for those four words — a search for `saw` surfaces "Then I returned and saw
+vanity under the sun" first — but it costs the feature that matters more. With
+the boost in place, the top twenty results for `speak`, `say`, `go` and `see`
+contained no archaic form at all: `spake`, `saith` and `went` were pushed below
+a hundred literal matches. Since `spake` occurs more often than `speak` in this
+translation, that trade loses more than it wins, and it also roughly doubled the
+CPU of a common-word search. The homograph stays.
+
+What *was* fixable has been fixed: the rules no longer merge `being` into "bee",
+`doing` into "doe", `lying` into "lye", or `thing` into "the".
 
 **Author and date fields are traditional ascriptions**, not critical judgements.
 "Moses" for the Pentateuch is what the tradition says, and the date ranges are

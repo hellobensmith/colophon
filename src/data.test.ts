@@ -106,6 +106,36 @@ describe("descriptive titles", () => {
   });
 });
 
+describe("editorial brackets", () => {
+  test("Selah markers are closed", () => {
+    const psalm3 = verseByReference("PSA", 3, 2).text;
+    expect(psalm3).toContain("[Selah]");
+    expect(psalm3).not.toMatch(/\[Selah$/);
+  });
+
+  /**
+   * The ASV brackets John 7:53-8:11 to mark the passage's disputed manuscript
+   * standing. That bracket opens in one verse and closes thirteen verses later,
+   * so it is legitimately unbalanced per verse — balancing brackets verse by
+   * verse would destroy real textual apparatus to tidy a markup artifact.
+   */
+  test("the disputed passage keeps its bracket across 13 verses", () => {
+    expect(verseByReference("JHN", 7, 53).text.startsWith("[")).toBe(true);
+    expect(verseByReference("JHN", 8, 11).text.endsWith("]")).toBe(true);
+  });
+
+  test("no other verse has an unbalanced bracket", () => {
+    const unbalanced: string[] = [];
+    for (let sequence = 1; sequence <= TOTAL_VERSES; sequence += 1) {
+      const text = textAt(sequence);
+      const opens = (text.match(/\[/g) ?? []).length;
+      const closes = (text.match(/\]/g) ?? []).length;
+      if (opens !== closes) unbalanced.push(verseAt(sequence).id);
+    }
+    expect(unbalanced).toEqual(["JHN.7.53", "JHN.8.11"]);
+  });
+});
+
 describe("sequence integrity", () => {
   test("round-trips every book boundary", () => {
     for (const bookId of PROTESTANT_ORDER) {
