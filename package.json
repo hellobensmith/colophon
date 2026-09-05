@@ -9,7 +9,8 @@
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "check:contract": "bun scripts/check-contract.ts"
+    "check:contract": "bun scripts/check-contract.ts",
+    "conformance": "bun conformance/run.ts"
   },
   "dependencies": {
     "hono": "4.13.5"

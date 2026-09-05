@@ -30,7 +30,7 @@ paths:
                 type: object
                 required:
                   [status, database, edition_id, revision_id, generation_id,
-                   verse_count, timestamp]
+                   verse_count, translation, source, timestamp]
                 additionalProperties: false
                 properties:
                   status: { type: string, enum: [ok] }
@@ -55,6 +55,17 @@ paths:
                       including metadata corrections over identical text. Cache
                       keys belong to this, not to revision_id.
                   verse_count: { type: integer }
+                  translation:
+                    $ref: "#/components/schemas/Translation"
+                  source:
+                    type: object
+                    required: [name, url, format]
+                    additionalProperties: false
+                    description: Where the text came from, so provenance travels with it.
+                    properties:
+                      name: { type: string }
+                      url: { type: string }
+                      format: { type: string }
                   timestamp: { type: string, format: date-time }
 
   /books:

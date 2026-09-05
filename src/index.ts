@@ -45,6 +45,13 @@ const IMMUTABLE = "public, max-age=31536000, immutable";
 const DAILY = "public, max-age=86400";
 const BRIEF = "public, max-age=60";
 
+/** Where the text came from, so provenance travels with the data. */
+const SOURCE = {
+  name: "eBible.org",
+  url: "https://ebible.org/Scriptures/eng-asv_usfx.zip",
+  format: "USFX",
+} as const;
+
 const TRANSLATION = {
   id: "asv",
   name: "American Standard Version",
@@ -163,6 +170,10 @@ app.get("/health", (context) => {
     revision_id: REVISION_ID,
     generation_id: GENERATION_ID,
     verse_count: TOTAL_VERSES,
+    // Stated here, not only in the README: a consumer should be able to learn
+    // its obligations from the API rather than from prose it may never read.
+    translation: TRANSLATION,
+    source: SOURCE,
     timestamp: new Date().toISOString(),
   });
 });

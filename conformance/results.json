@@ -1,0 +1,854 @@
+{
+  "base": "https://bible-api.hellobensmith.workers.dev",
+  "adapters": [
+    "ours",
+    "bible-api.com",
+    "labs.bible.org",
+    "bolls.life",
+    "rkeplin",
+    "getbible.net",
+    "wldeh"
+  ],
+  "cells": [
+    {
+      "adapter": "ours",
+      "probe": "ambiguous-abbreviation",
+      "verdict": "safe",
+      "summary": "refused, naming the candidates",
+      "request": "Jo 3:16",
+      "evidence": "Ambiguous book abbreviation \"Jo\" — it could mean Job, Joel, John, Jonah, Joshua"
+    },
+    {
+      "adapter": "ours",
+      "probe": "verse-out-of-range",
+      "verdict": "safe",
+      "summary": "refused, stating the real length",
+      "request": "John 3:99",
+      "evidence": "John 3 only has 36 verses"
+    },
+    {
+      "adapter": "ours",
+      "probe": "chapter-out-of-range",
+      "verdict": "safe",
+      "summary": "refused",
+      "request": "Genesis 99:1",
+      "evidence": "Genesis has 50 chapters, so there is no chapter 99"
+    },
+    {
+      "adapter": "ours",
+      "probe": "cross-chapter-range",
+      "verdict": "safe",
+      "summary": "4 verses across both chapters",
+      "request": "Genesis 1:31-2:3",
+      "evidence": null
+    },
+    {
+      "adapter": "ours",
+      "probe": "multi-segment",
+      "verdict": "safe",
+      "summary": "verses 4-7 and 13",
+      "request": "1 Corinthians 13:4-7,13",
+      "evidence": null
+    },
+    {
+      "adapter": "ours",
+      "probe": "single-chapter-book",
+      "verdict": "safe",
+      "summary": "both forms agree",
+      "request": "Jude 5 / Jude 1:5",
+      "evidence": "Now I desire to put you in remembrance, though ye know all things once…"
+    },
+    {
+      "adapter": "ours",
+      "probe": "omitted-verse",
+      "verdict": "divergent",
+      "summary": "empty text, with a note",
+      "request": "MAT 17:21",
+      "evidence": "Many authorities, some ancient, insert v. 21. But this kind goeth not out save b…"
+    },
+    {
+      "adapter": "ours",
+      "probe": "psalm-superscription",
+      "verdict": "safe",
+      "summary": "verse 1 correct, heading served separately",
+      "request": "PSA 23:1",
+      "evidence": null
+    },
+    {
+      "adapter": "ours",
+      "probe": "divine-name",
+      "verdict": "safe",
+      "summary": "Jehovah preserved",
+      "request": "EXO 6:3",
+      "evidence": "and I appeared unto Abraham, unto Isaac, and unto Jacob, as God Almigh…"
+    },
+    {
+      "adapter": "ours",
+      "probe": "markup-leakage",
+      "verdict": "safe",
+      "summary": "plain text",
+      "request": "JHN 3:16",
+      "evidence": "For God so loved the world, that he gave his only begotten Son, that w…"
+    },
+    {
+      "adapter": "ours",
+      "probe": "typography",
+      "verdict": "safe",
+      "summary": "ligature kept, curly apostrophe kept",
+      "request": "MAT 22:21",
+      "evidence": "They say unto him, Cæsar’s. Then saith he unto them, Render therefore unto Cæsar…"
+    },
+    {
+      "adapter": "ours",
+      "probe": "last-verse",
+      "verdict": "safe",
+      "summary": "returned",
+      "request": "REV 22:21",
+      "evidence": "The grace of the Lord Jesus be with the saints. Amen."
+    },
+    {
+      "adapter": "ours",
+      "probe": "declares-edition",
+      "verdict": "safe",
+      "summary": "names the edition and a revision",
+      "request": "self-description",
+      "evidence": null
+    },
+    {
+      "adapter": "ours",
+      "probe": "declares-licence",
+      "verdict": "missing",
+      "summary": "no licence or provenance stated",
+      "request": "self-description",
+      "evidence": null
+    },
+    {
+      "adapter": "ours",
+      "probe": "error-status",
+      "verdict": "safe",
+      "summary": "404 for an unknown book",
+      "request": "Hezekiah 1:1",
+      "evidence": null
+    },
+    {
+      "adapter": "bible-api.com",
+      "probe": "ambiguous-abbreviation",
+      "verdict": "safe",
+      "summary": "refused",
+      "request": "Jo 3:16",
+      "evidence": "{\"error\":\"not found\"}"
+    },
+    {
+      "adapter": "bible-api.com",
+      "probe": "verse-out-of-range",
+      "verdict": "safe",
+      "summary": "refused",
+      "request": "John 3:99",
+      "evidence": "{\"error\":\"not found\"}"
+    },
+    {
+      "adapter": "bible-api.com",
+      "probe": "chapter-out-of-range",
+      "verdict": "safe",
+      "summary": "refused",
+      "request": "Genesis 99:1",
+      "evidence": "{\"error\":\"not found\"}"
+    },
+    {
+      "adapter": "bible-api.com",
+      "probe": "cross-chapter-range",
+      "verdict": "safe",
+      "summary": "4 verses across both chapters",
+      "request": "Genesis 1:31-2:3",
+      "evidence": null
+    },
+    {
+      "adapter": "bible-api.com",
+      "probe": "multi-segment",
+      "verdict": "safe",
+      "summary": "verses 4-7 and 13",
+      "request": "1 Corinthians 13:4-7,13",
+      "evidence": null
+    },
+    {
+      "adapter": "bible-api.com",
+      "probe": "single-chapter-book",
+      "verdict": "safe",
+      "summary": "both forms agree",
+      "request": "Jude 5 / Jude 1:5",
+      "evidence": "Now I desire to put you in remembrance, though ye know all things once…"
+    },
+    {
+      "adapter": "bible-api.com",
+      "probe": "omitted-verse",
+      "verdict": "divergent",
+      "summary": "text present, bracketed",
+      "request": "Matthew 17:21",
+      "evidence": "[But this kind goeth not out save by prayer and fasting.]"
+    },
+    {
+      "adapter": "bible-api.com",
+      "probe": "psalm-superscription",
+      "verdict": "safe",
+      "summary": "verse 1 correct, heading served separately",
+      "request": "Psalms 23:1",
+      "evidence": null
+    },
+    {
+      "adapter": "bible-api.com",
+      "probe": "divine-name",
+      "verdict": "safe",
+      "summary": "Jehovah preserved",
+      "request": "Exodus 6:3",
+      "evidence": "and I appeared unto Abraham, unto Isaac, and unto Jacob, as God Almigh…"
+    },
+    {
+      "adapter": "bible-api.com",
+      "probe": "markup-leakage",
+      "verdict": "safe",
+      "summary": "plain text",
+      "request": "John 3:16",
+      "evidence": "For God so loved the world, that he gave his only begotten Son, that w…"
+    },
+    {
+      "adapter": "bible-api.com",
+      "probe": "typography",
+      "verdict": "divergent",
+      "summary": "ligature transliterated to ae",
+      "request": "Matthew 22:21",
+      "evidence": "They say unto him, Caesar`s. Then saith he unto them, Render therefore unto Caes…"
+    },
+    {
+      "adapter": "bible-api.com",
+      "probe": "last-verse",
+      "verdict": "safe",
+      "summary": "returned",
+      "request": "Revelation 22:21",
+      "evidence": "The grace of the Lord Jesus be with the saints. Amen."
+    },
+    {
+      "adapter": "bible-api.com",
+      "probe": "declares-edition",
+      "verdict": "divergent",
+      "summary": "names the edition, no revision identifier",
+      "request": "self-description",
+      "evidence": null
+    },
+    {
+      "adapter": "bible-api.com",
+      "probe": "declares-licence",
+      "verdict": "safe",
+      "summary": "states licence or copyright",
+      "request": "self-description",
+      "evidence": null
+    },
+    {
+      "adapter": "bible-api.com",
+      "probe": "error-status",
+      "verdict": "safe",
+      "summary": "404 for an unknown book",
+      "request": "Hezekiah 1:1",
+      "evidence": null
+    },
+    {
+      "adapter": "labs.bible.org",
+      "probe": "ambiguous-abbreviation",
+      "verdict": "unsafe",
+      "summary": "200 — silently chose John",
+      "request": "Jo 3:16",
+      "evidence": "For this is the way God loved the world: He gave his one and only Son, so that everyone wh…"
+    },
+    {
+      "adapter": "labs.bible.org",
+      "probe": "verse-out-of-range",
+      "verdict": "unsafe",
+      "summary": "200 — returned verse 1 instead",
+      "request": "John 3:99",
+      "evidence": "Now a certain man, a Pharisee named Nicodemus, who was a member of the Jewish ruling counc…"
+    },
+    {
+      "adapter": "labs.bible.org",
+      "probe": "chapter-out-of-range",
+      "verdict": "unsafe",
+      "summary": "200 — returned chapter 1",
+      "request": "Genesis 99:1",
+      "evidence": "In the beginning God created the heavens and the earth."
+    },
+    {
+      "adapter": "labs.bible.org",
+      "probe": "cross-chapter-range",
+      "verdict": "safe",
+      "summary": "4 verses across both chapters",
+      "request": "Genesis 1:31-2:3",
+      "evidence": null
+    },
+    {
+      "adapter": "labs.bible.org",
+      "probe": "multi-segment",
+      "verdict": "divergent",
+      "summary": "13 verses: 4,5,6,7,1,2,3,8,9,10,11,12,13",
+      "request": "1 Corinthians 13:4-7,13",
+      "evidence": null
+    },
+    {
+      "adapter": "labs.bible.org",
+      "probe": "single-chapter-book",
+      "verdict": "divergent",
+      "summary": "`Jude 5` returned the whole book (25 verses)",
+      "request": "Jude 5 / Jude 1:5",
+      "evidence": "From Jude, a slave of Jesus Christ and brother of James, to those who …"
+    },
+    {
+      "adapter": "labs.bible.org",
+      "probe": "omitted-verse",
+      "verdict": "divergent",
+      "summary": "empty, unexplained",
+      "request": "Matthew 17:21",
+      "evidence": null
+    },
+    {
+      "adapter": "labs.bible.org",
+      "probe": "psalm-superscription",
+      "verdict": "unsafe",
+      "summary": "superscription folded into verse 1",
+      "request": "Psalms 23:1",
+      "evidence": "A psalm of David. The Lord is my shepherd, I lack nothing."
+    },
+    {
+      "adapter": "labs.bible.org",
+      "probe": "divine-name",
+      "verdict": "not-applicable",
+      "summary": "edition is net, not the ASV",
+      "request": "Exodus 6:3",
+      "evidence": "I appeared to Abraham, to Isaac, and to Jacob as God Almight…"
+    },
+    {
+      "adapter": "labs.bible.org",
+      "probe": "markup-leakage",
+      "verdict": "safe",
+      "summary": "plain text",
+      "request": "John 3:16",
+      "evidence": "For this is the way God loved the world: He gave his one and only Son,…"
+    },
+    {
+      "adapter": "labs.bible.org",
+      "probe": "typography",
+      "verdict": "not-applicable",
+      "summary": "edition is net",
+      "request": "Matthew 22:21",
+      "evidence": null
+    },
+    {
+      "adapter": "labs.bible.org",
+      "probe": "last-verse",
+      "verdict": "safe",
+      "summary": "returned",
+      "request": "Revelation 22:21",
+      "evidence": "The grace of the Lord Jesus be with all."
+    },
+    {
+      "adapter": "labs.bible.org",
+      "probe": "declares-edition",
+      "verdict": "not-applicable",
+      "summary": "does not offer self-description",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "labs.bible.org",
+      "probe": "declares-licence",
+      "verdict": "not-applicable",
+      "summary": "does not offer self-description",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "labs.bible.org",
+      "probe": "error-status",
+      "verdict": "safe",
+      "summary": "400 for an unknown book",
+      "request": "Hezekiah 1:1",
+      "evidence": null
+    },
+    {
+      "adapter": "bolls.life",
+      "probe": "ambiguous-abbreviation",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "bolls.life",
+      "probe": "verse-out-of-range",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "bolls.life",
+      "probe": "chapter-out-of-range",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "bolls.life",
+      "probe": "cross-chapter-range",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "bolls.life",
+      "probe": "multi-segment",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "bolls.life",
+      "probe": "single-chapter-book",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "bolls.life",
+      "probe": "omitted-verse",
+      "verdict": "divergent",
+      "summary": "refused (404)",
+      "request": "MAT 17:21",
+      "evidence": null
+    },
+    {
+      "adapter": "bolls.life",
+      "probe": "psalm-superscription",
+      "verdict": "unsafe",
+      "summary": "superscription folded into verse 1",
+      "request": "PSA 23:1",
+      "evidence": "<sup>A Psalm of David.</sup> Jehovah<S>3068</S> is my shepherd<S>7462</S>; I sha…"
+    },
+    {
+      "adapter": "bolls.life",
+      "probe": "divine-name",
+      "verdict": "safe",
+      "summary": "Jehovah preserved",
+      "request": "EXO 6:3",
+      "evidence": "and I appeared<S>7200</S> unto Abraham<S>85</S>, unto Isaac<S>3327</S>…"
+    },
+    {
+      "adapter": "bolls.life",
+      "probe": "markup-leakage",
+      "verdict": "unsafe",
+      "summary": "44 markup tag(s) inside the text",
+      "request": "JHN 3:16",
+      "evidence": "For<S>1063</S> God<S>2316</S> so<S>3779</S> loved<S>25</S> the world<S>2889</S>, that<S>56…"
+    },
+    {
+      "adapter": "bolls.life",
+      "probe": "typography",
+      "verdict": "divergent",
+      "summary": "ligature transliterated to ae",
+      "request": "MAT 22:21",
+      "evidence": "They say<S>3004</S> unto him<S>846</S>, Caesar<S>2541</S>'s. Then<S>5119</S> sai…"
+    },
+    {
+      "adapter": "bolls.life",
+      "probe": "last-verse",
+      "verdict": "safe",
+      "summary": "returned",
+      "request": "REV 22:21",
+      "evidence": "The grace<S>5485</S> of the<S>2257</S> Lord<S>2962</S> Jesus<S>2424</S…"
+    },
+    {
+      "adapter": "bolls.life",
+      "probe": "declares-edition",
+      "verdict": "safe",
+      "summary": "names the edition and a revision",
+      "request": "self-description",
+      "evidence": null
+    },
+    {
+      "adapter": "bolls.life",
+      "probe": "declares-licence",
+      "verdict": "missing",
+      "summary": "no licence or provenance stated",
+      "request": "self-description",
+      "evidence": null
+    },
+    {
+      "adapter": "bolls.life",
+      "probe": "error-status",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "rkeplin",
+      "probe": "ambiguous-abbreviation",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "rkeplin",
+      "probe": "verse-out-of-range",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "rkeplin",
+      "probe": "chapter-out-of-range",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "rkeplin",
+      "probe": "cross-chapter-range",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "rkeplin",
+      "probe": "multi-segment",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "rkeplin",
+      "probe": "single-chapter-book",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "rkeplin",
+      "probe": "omitted-verse",
+      "verdict": "divergent",
+      "summary": "text present, unmarked",
+      "request": "MAT 17:21",
+      "evidence": "`But this kind goeth not out save by prayer and fasting.'"
+    },
+    {
+      "adapter": "rkeplin",
+      "probe": "psalm-superscription",
+      "verdict": "safe",
+      "summary": "verse 1 correct, heading served separately",
+      "request": "PSA 23:1",
+      "evidence": null
+    },
+    {
+      "adapter": "rkeplin",
+      "probe": "divine-name",
+      "verdict": "safe",
+      "summary": "Jehovah preserved",
+      "request": "EXO 6:3",
+      "evidence": "and I appeared unto Abraham, unto Isaac, and unto Jacob, as God Almigh…"
+    },
+    {
+      "adapter": "rkeplin",
+      "probe": "markup-leakage",
+      "verdict": "safe",
+      "summary": "plain text",
+      "request": "JHN 3:16",
+      "evidence": "For God so loved the world, that he gave his only begotten Son, that w…"
+    },
+    {
+      "adapter": "rkeplin",
+      "probe": "typography",
+      "verdict": "divergent",
+      "summary": "ligature transliterated to ae",
+      "request": "MAT 22:21",
+      "evidence": "They say unto him, Caesar's. Then saith he unto them, Render therefore unto Caes…"
+    },
+    {
+      "adapter": "rkeplin",
+      "probe": "last-verse",
+      "verdict": "safe",
+      "summary": "returned",
+      "request": "REV 22:21",
+      "evidence": "The grace of the Lord Jesus be with the saints. Amen."
+    },
+    {
+      "adapter": "rkeplin",
+      "probe": "declares-edition",
+      "verdict": "divergent",
+      "summary": "names the edition, no revision identifier",
+      "request": "self-description",
+      "evidence": null
+    },
+    {
+      "adapter": "rkeplin",
+      "probe": "declares-licence",
+      "verdict": "missing",
+      "summary": "no licence or provenance stated",
+      "request": "self-description",
+      "evidence": null
+    },
+    {
+      "adapter": "rkeplin",
+      "probe": "error-status",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "getbible.net",
+      "probe": "ambiguous-abbreviation",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "getbible.net",
+      "probe": "verse-out-of-range",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "getbible.net",
+      "probe": "chapter-out-of-range",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "getbible.net",
+      "probe": "cross-chapter-range",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "getbible.net",
+      "probe": "multi-segment",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "getbible.net",
+      "probe": "single-chapter-book",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "getbible.net",
+      "probe": "omitted-verse",
+      "verdict": "divergent",
+      "summary": "empty, unexplained",
+      "request": "MAT 17:21",
+      "evidence": null
+    },
+    {
+      "adapter": "getbible.net",
+      "probe": "psalm-superscription",
+      "verdict": "divergent",
+      "summary": "verse 1 correct, heading not offered",
+      "request": "PSA 23:1",
+      "evidence": "Jehovah is my shepherd; I shall not want."
+    },
+    {
+      "adapter": "getbible.net",
+      "probe": "divine-name",
+      "verdict": "safe",
+      "summary": "Jehovah preserved",
+      "request": "EXO 6:3",
+      "evidence": "and I appeared unto Abraham, unto Isaac, and unto Jacob, as God Almigh…"
+    },
+    {
+      "adapter": "getbible.net",
+      "probe": "markup-leakage",
+      "verdict": "safe",
+      "summary": "plain text",
+      "request": "JHN 3:16",
+      "evidence": "For God so loved the world, that he gave his only begotten Son, that w…"
+    },
+    {
+      "adapter": "getbible.net",
+      "probe": "typography",
+      "verdict": "safe",
+      "summary": "ligature kept, curly apostrophe kept",
+      "request": "MAT 22:21",
+      "evidence": "They say unto him, Cæsar’s. Then saith he unto them, Render therefore unto Cæsar…"
+    },
+    {
+      "adapter": "getbible.net",
+      "probe": "last-verse",
+      "verdict": "safe",
+      "summary": "returned",
+      "request": "REV 22:21",
+      "evidence": "The grace of the Lord Jesus be with the saints. Amen."
+    },
+    {
+      "adapter": "getbible.net",
+      "probe": "declares-edition",
+      "verdict": "safe",
+      "summary": "names the edition and a revision",
+      "request": "self-description",
+      "evidence": null
+    },
+    {
+      "adapter": "getbible.net",
+      "probe": "declares-licence",
+      "verdict": "safe",
+      "summary": "states licence or copyright",
+      "request": "self-description",
+      "evidence": null
+    },
+    {
+      "adapter": "getbible.net",
+      "probe": "error-status",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "wldeh",
+      "probe": "ambiguous-abbreviation",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "wldeh",
+      "probe": "verse-out-of-range",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "wldeh",
+      "probe": "chapter-out-of-range",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "wldeh",
+      "probe": "cross-chapter-range",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "wldeh",
+      "probe": "multi-segment",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "wldeh",
+      "probe": "single-chapter-book",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    },
+    {
+      "adapter": "wldeh",
+      "probe": "omitted-verse",
+      "verdict": "divergent",
+      "summary": "text present, unmarked",
+      "request": "MAT 17:21",
+      "evidence": "17:21 Many authorities, some ancient, insert v. 21. But this kind goeth not out …"
+    },
+    {
+      "adapter": "wldeh",
+      "probe": "psalm-superscription",
+      "verdict": "divergent",
+      "summary": "verse 1 correct, heading not offered",
+      "request": "PSA 23:1",
+      "evidence": "Jehovah is my shepherd; I shall not want."
+    },
+    {
+      "adapter": "wldeh",
+      "probe": "divine-name",
+      "verdict": "safe",
+      "summary": "Jehovah preserved",
+      "request": "EXO 6:3",
+      "evidence": "and I appeared unto Abraham, unto Isaac, and unto Jacob, as God Almigh…"
+    },
+    {
+      "adapter": "wldeh",
+      "probe": "markup-leakage",
+      "verdict": "safe",
+      "summary": "plain text",
+      "request": "JHN 3:16",
+      "evidence": "For God so loved the world, that he gave his only begotten Son, that w…"
+    },
+    {
+      "adapter": "wldeh",
+      "probe": "typography",
+      "verdict": "safe",
+      "summary": "ligature kept, curly apostrophe kept",
+      "request": "MAT 22:21",
+      "evidence": "They say unto him, Cæsar’s. Then saith he unto them, Render therefore unto Cæsar…"
+    },
+    {
+      "adapter": "wldeh",
+      "probe": "last-verse",
+      "verdict": "safe",
+      "summary": "returned",
+      "request": "REV 22:21",
+      "evidence": "The grace of the Lord Jesus be with the saints. Amen."
+    },
+    {
+      "adapter": "wldeh",
+      "probe": "declares-edition",
+      "verdict": "safe",
+      "summary": "names the edition and a revision",
+      "request": "self-description",
+      "evidence": null
+    },
+    {
+      "adapter": "wldeh",
+      "probe": "declares-licence",
+      "verdict": "safe",
+      "summary": "states licence or copyright",
+      "request": "self-description",
+      "evidence": null
+    },
+    {
+      "adapter": "wldeh",
+      "probe": "error-status",
+      "verdict": "not-applicable",
+      "summary": "does not offer freeform-reference",
+      "request": null,
+      "evidence": null
+    }
+  ]
+}
