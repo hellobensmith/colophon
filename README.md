@@ -144,6 +144,14 @@ Two things make search work on a translation written in 1901.
 10:11 and 10:14 — not the 768 that contain either word. The count means what it
 says.
 
+**Typography is folded.** This edition prints 1901 typography, and two
+characters in it defeat a naive tokenizer. Every apostrophe in the corpus is
+U+2019, not the one on your keyboard — so `Jehovah's` used to return nothing at
+all. And æ appears in about twenty-six proper nouns, where it was read as a word
+separator: `Cæsar` tokenized to `sar` and matched *Sarai*, while `Caesar` matched
+nothing. Both spellings now reach the same verses, and the served text keeps the
+ligature and the curly quote exactly as the ASV printed them.
+
 **Words match their whole family.** Prefix matching alone fails badly here,
 because the most common verbs in this translation are irregular:
 
@@ -165,6 +173,25 @@ could derive are listed explicitly in `src/morphology.ts`.
 
 Ranking is BM25. Since every result contains every term, length normalization
 does the ordering — the most concise verse containing all your words comes first.
+
+## Two identities
+
+Every response carries `x-generation-id` and `x-revision-id`, and `/health`
+reports both.
+
+They answer different questions. **`revision_id`** is what the text *is*,
+derived from the source archive alone — it moves only when eBible republishes.
+**`generation_id`** is what was *published*, derived from the whole build
+manifest — it moves whenever anything published changes, including a metadata
+correction over identical text.
+
+The distinction only costs something the day it is missing. Correcting a canon
+date should retire every cached response but must not invalidate a coordinate
+someone saved into the text. One identifier gets exactly one of those right.
+
+`manifest.json` records what a generation is made of: source hash, artifact
+hashes, policy versions, and the corpus counts. Rebuilding from identical source
+reproduces the same `generation_id` byte for byte.
 
 ## The canons
 
@@ -311,6 +338,11 @@ times slower than a laptop suggested. Only function words reach it: `the`, `and`
 (5,821 verses) included. Any query of two or more terms is exact regardless,
 since the rarest term seeds the search and the common one only filters it.
 
+**Modern spellings of ligatured names are not aliased.** `Judæa` and `Judaea`
+both work, because the fold expands the ligature. `Judea` — the modern spelling
+with one `a` — does not, since that is a synonym problem rather than a
+normalization one, and solving it would need a name table.
+
 **Search has no word sense.** Four tokens carry two meanings each: `lie`
 (recline / falsehood), `saw` (tool / past of see), `found` (past of find / to
 establish), and `bear` (carry / the animal). The two senses are the same string,
@@ -339,6 +371,8 @@ NABRE order, Orthodox against Rahlfs-Hanhart's `Septuaginta`.
 | Path | Role |
 | --- | --- |
 | `scripts/build-data.ts` | Download, parse, verify, generate |
+| `src/identity.ts` | Revision and generation identity |
+| `src/tokenize.ts` | The one tokenizer, shared by index and query |
 | `src/usfx.ts` | USFX XML → verses, titles, notes |
 | `src/validate.ts` | The assertions the build must pass |
 | `src/data/` | Generated; do not edit |

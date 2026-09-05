@@ -28,7 +28,9 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [status, database, timestamp]
+                required:
+                  [status, database, edition_id, revision_id, generation_id,
+                   verse_count, timestamp]
                 additionalProperties: false
                 properties:
                   status: { type: string, enum: [ok] }
@@ -36,6 +38,23 @@ paths:
                     type: string
                     enum: [embedded]
                     description: The corpus ships inside the Worker; there is no external store.
+                  edition_id:
+                    type: string
+                    description: Which text. Constant for this API.
+                  revision_id:
+                    type: string
+                    description: >
+                      Which revision of that text, derived from the source archive
+                      alone. Moves only when eBible republishes. A coordinate stored
+                      against the text should be checked against this.
+                  generation_id:
+                    type: string
+                    description: >
+                      Which published set of artifacts, derived from the whole
+                      build manifest. Moves whenever anything published changes,
+                      including metadata corrections over identical text. Cache
+                      keys belong to this, not to revision_id.
+                  verse_count: { type: integer }
                   timestamp: { type: string, format: date-time }
 
   /books:

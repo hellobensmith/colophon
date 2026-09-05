@@ -28,11 +28,12 @@ import {
   subscription,
   verseAt,
   verseByReference,
+  TOTAL_VERSES,
   type CorpusVerse,
 } from "./corpus.ts";
 import { search } from "./search.ts";
 import { DEMO_HTML } from "./demo.ts";
-import { TITLED_PSALMS } from "./data/meta.ts";
+import { TITLED_PSALMS, REVISION_ID, GENERATION_ID, EDITION_ID } from "./data/meta.ts";
 
 /** Longest passage served in one response. */
 const MAX_PASSAGE_VERSES = 500;
@@ -78,6 +79,18 @@ const NOT_FOUND_KINDS: ReadonlySet<ParseErrorKind> = new Set<ParseErrorKind>([
 const app = new Hono();
 
 app.use("*", cors({ origin: "*", allowMethods: ["GET", "OPTIONS"] }));
+
+/**
+ * Both identities travel on every response. A client caching by `x-generation-id`
+ * retires its entries whenever anything published changes; a client that has
+ * stored a coordinate into the text checks `x-revision-id`, which moves only
+ * when the text itself does.
+ */
+app.use("*", async (context, next) => {
+  await next();
+  context.header("x-generation-id", GENERATION_ID);
+  context.header("x-revision-id", REVISION_ID);
+});
 
 /*
  * Caching is handled by the platform, not here. `[cache] enabled` in
@@ -146,6 +159,10 @@ app.get("/health", (context) => {
   return context.json({
     status: "ok",
     database: "embedded",
+    edition_id: EDITION_ID,
+    revision_id: REVISION_ID,
+    generation_id: GENERATION_ID,
+    verse_count: TOTAL_VERSES,
     timestamp: new Date().toISOString(),
   });
 });

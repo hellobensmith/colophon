@@ -577,13 +577,25 @@ export const DEMO_HTML = `<!doctype html>
   var searchRequest = el("search-request");
   var searchResult = el("search-result");
 
+  /* Mirrors src/tokenize.ts: 1901 typography folded to what a reader types. */
+  function fold(text) {
+    return text.replace(/\u2019/g, " ").replace(/\u00e6/g, "ae")
+               .replace(/\u00c6/g, "Ae").replace(/\u00ef/g, "i").replace(/\u00fc/g, "u");
+  }
+
   function highlight(text, stems) {
+    text = String(text);
     var fragment = document.createDocumentFragment();
     if (!stems.length) { fragment.appendChild(document.createTextNode(text)); return fragment; }
+    /* Fold for matching only where it preserves length, so mark positions still
+       line up with the original text. The ligature expands, so those verses fall
+       back to matching the text as printed. */
+    var folded = text.replace(/\u2019/g, "'").replace(/\u00ef/g, "i").replace(/\u00fc/g, "u");
+    var haystack = folded.length === text.length ? folded : text;
     var pattern = new RegExp("(" + stems.join("|") + ")", "gi");
     var cursor = 0;
     var match;
-    while ((match = pattern.exec(text)) !== null) {
+    while ((match = pattern.exec(haystack)) !== null) {
       if (match.index > cursor) { fragment.appendChild(document.createTextNode(text.slice(cursor, match.index))); }
       fragment.appendChild(make("mark", null, match[0]));
       cursor = match.index + match[0].length;
@@ -609,8 +621,10 @@ export const DEMO_HTML = `<!doctype html>
       return;
     }
 
-    /* Highlight short stems, so family matches ("spake" for "speak") show. */
-    var stems = data.query.toLowerCase().split(/[^a-z']+/).filter(function (term) {
+    /* Highlight short stems, so family matches ("spake" for "speak") show.
+       Folded the way the index is, or a query typed with an ordinary apostrophe
+       would highlight nothing in text printed with a curly one. */
+    var stems = fold(data.query).toLowerCase().split(/[^a-z]+/).filter(function (term) {
       return term.length >= 2;
     }).map(function (term) {
       return term.replace(/[.*+?^\${}()|[\\]\\\\]/g, "\\\\$&").slice(0, 4);

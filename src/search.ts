@@ -13,6 +13,7 @@
 import { INDEX, WORD_COUNTS, TOKEN_COUNT, DOC_FREQUENCIES } from "./data/search-index.ts";
 import { decodeDeltas, TOTAL_VERSES, verseAt, type CorpusVerse } from "./corpus.ts";
 import { FAMILY_GROUPS } from "./data/families.ts";
+import { tokenize } from "./tokenize.ts";
 
 const K1 = 1.2;
 const B = 0.75;
@@ -179,13 +180,13 @@ function lowerBound(prefix: string): number {
   return low;
 }
 
-const TOKEN_SPLIT = /[^a-z']+/;
-
+/**
+ * Queries are tokenized by exactly the code that built the index. Tokenizing
+ * them differently is the failure mode this import exists to prevent: both
+ * sides look correct and the result is silently empty.
+ */
 export function tokenizeQuery(query: string): string[] {
-  return query
-    .toLowerCase()
-    .split(TOKEN_SPLIT)
-    .filter((token) => token.length >= 2);
+  return tokenize(query);
 }
 
 export interface SearchHit extends CorpusVerse {

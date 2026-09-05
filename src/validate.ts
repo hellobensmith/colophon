@@ -78,6 +78,23 @@ export const EXPECTED_TITLE_COUNT = 116;
  */
 export const EXPECTED_SUBSCRIPTIONS: readonly string[] = ["HAB.3"];
 
+/**
+ * Characters the parser drops on purpose, by element — the lossy inventory.
+ * These are document furniture, not scripture: the book id line, the running
+ * header, table-of-contents entries, the language code, and footnote callers.
+ *
+ * Asserted rather than merely reported. A change here means the source's shape
+ * changed, and the question of whether text moved from a kept element to a
+ * dropped one deserves an answer before the corpus is republished.
+ */
+export const EXPECTED_DROPPED: ReadonlyMap<string, number> = new Map([
+  ["languageCode", 3],
+  ["id", 1904],
+  ["h", 585],
+  ["toc", 2809],
+  ["fr", 89],
+]);
+
 export class ValidationError extends Error {
   constructor(public readonly failures: readonly string[]) {
     super(`Corpus validation failed with ${failures.length} error(s):\n  - ${failures.join("\n  - ")}`);
@@ -213,6 +230,45 @@ export function validateCorpus(doc: UsfxDocument): void {
       `${openSelah.length} Selah marker(s) left unclosed, e.g. ${openSelah[0]?.bcv ?? ""}`,
     );
   }
+
+  // Coverage: every character of source text is either emitted somewhere or
+  // dropped somewhere. Text moving to the wrong destination shifts two buckets;
+  // text vanishing breaks the sum.
+  const ledger = doc.ledger;
+  const sum = (bucket: ReadonlyMap<string, number>): number =>
+    [...bucket.values()].reduce((total, n) => total + n, 0);
+  const accounted =
+    sum(ledger.toVerses) +
+    sum(ledger.toTitles) +
+    sum(ledger.toSubscriptions) +
+    sum(ledger.toNotes) +
+    sum(ledger.dropped) +
+    ledger.unattributed;
+  if (accounted !== ledger.sourceCharacters) {
+    failures.push(
+      `coverage: ${ledger.sourceCharacters} source characters but ${accounted} accounted for ` +
+        `(${ledger.sourceCharacters - accounted} unexplained)`,
+    );
+  }
+
+  for (const [element, expected] of EXPECTED_DROPPED) {
+    const actual = ledger.dropped.get(element) ?? 0;
+    if (actual !== expected) {
+      failures.push(`dropped <${element}>: expected ${expected} characters, got ${actual}`);
+    }
+  }
+  for (const element of ledger.dropped.keys()) {
+    if (!EXPECTED_DROPPED.has(element)) {
+      failures.push(`<${element}>: dropping text that was not previously dropped`);
+    }
+  }
+
+  // The superscription of a titled Psalm must reach the title bucket, and
+  // Habakkuk's closing line the subscription bucket. Empty buckets would mean
+  // the routing silently stopped working.
+  if (sum(ledger.toTitles) === 0) failures.push("no text reached any chapter superscription");
+  if (sum(ledger.toSubscriptions) === 0) failures.push("no text reached any chapter subscription");
+  if (sum(ledger.toNotes) === 0) failures.push("no text reached any verse note");
 
   const withMarkup = doc.verses.filter((verse) => /[<>]/.test(verse.text));
   if (withMarkup.length > 0) {

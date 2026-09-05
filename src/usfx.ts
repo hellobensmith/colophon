@@ -11,11 +11,97 @@
  * boundaries inject nothing — doing so would put spaces before punctuation.
  */
 
+/**
+ * How each source element is treated. Every element the parser meets must appear
+ * here; anything else stops the build (see {@link UnknownElementError}).
+ *
+ * The point is not documentation. eBible republishes this archive periodically,
+ * and an edition that introduced `<wj>` or `<nd>` would otherwise be absorbed in
+ * silence — the words of Jesus or the divine name quietly becoming plain text,
+ * with every count still correct and every test still green. Failing loudly is
+ * the only way that change is visible.
+ */
+export type ElementRole =
+  /** Wrapper whose text belongs to the surrounding context: `<w>`, `<q>`, `<p>`. */
+  | "transparent"
+  /** Structural marker carrying no text of its own: `<v>`, `<ve>`, `<c>`. */
+  | "milestone"
+  /** Text routed to a verse's note rather than its body. */
+  | "footnote"
+  /** Footnote caller or reference: dropped, being apparatus rather than prose. */
+  | "footnote-reference"
+  /** Element whose entire subtree is dropped. */
+  | "discard"
+  /** Document-level information dropped from the text: book names, TOC entries. */
+  | "metadata";
+
+const ELEMENT_ROLES: ReadonlyMap<string, ElementRole> = new Map([
+  // Document structure.
+  ["usfx", "milestone"], ["book", "milestone"], ["c", "milestone"],
+  ["v", "milestone"], ["ve", "milestone"], ["d", "milestone"],
+  ["b", "milestone"],
+
+  // Text-bearing wrappers. `<w>` carries a Strong's number this edition does not
+  // otherwise expose; its text is ordinary scripture and must survive.
+  ["w", "transparent"], ["q", "transparent"], ["p", "transparent"],
+  ["add", "transparent"], ["qs", "transparent"], ["sc", "transparent"],
+  ["it", "transparent"], ["bd", "transparent"], ["bdit", "transparent"],
+  ["em", "transparent"], ["no", "transparent"], ["ord", "transparent"],
+  ["sup", "transparent"], ["pn", "transparent"], ["k", "transparent"],
+  ["tl", "transparent"], ["bk", "transparent"], ["sls", "transparent"],
+  ["qt", "transparent"], ["nd", "transparent"], ["wj", "transparent"],
+
+  // Footnotes.
+  ["f", "footnote"], ["ft", "footnote"], ["fqa", "footnote"], ["fq", "footnote"],
+  ["fr", "footnote-reference"], ["fk", "footnote-reference"],
+  ["fv", "footnote-reference"],
+
+  // Cross-references: captured nowhere in v1, so dropped with their subtree.
+  ["x", "discard"], ["xo", "discard"], ["xt", "discard"],
+  ["xk", "discard"], ["xq", "discard"],
+
+  // Document metadata that is not scripture.
+  ["id", "metadata"], ["ide", "metadata"], ["h", "metadata"],
+  ["toc", "metadata"], ["rem", "metadata"], ["languageCode", "metadata"],
+  ["cl", "metadata"], ["cp", "metadata"], ["ca", "metadata"],
+  ["va", "metadata"], ["vp", "metadata"], ["periph", "metadata"],
+  ["generated", "metadata"], ["s", "metadata"], ["ms", "metadata"],
+  ["mt", "metadata"], ["fig", "metadata"], ["ndx", "metadata"],
+]);
+
 /** Elements whose entire subtree is discarded. */
-const DISCARD = new Set(["x", "xo", "xt", "xk", "xq"]);
+const DISCARD: ReadonlySet<string> = new Set(
+  [...ELEMENT_ROLES].filter(([, role]) => role === "discard").map(([name]) => name),
+);
 
 /** Elements inside a footnote whose text is the caller/reference, not prose. */
-const FOOTNOTE_REF = new Set(["fr", "fk", "fv"]);
+const FOOTNOTE_REF: ReadonlySet<string> = new Set(
+  [...ELEMENT_ROLES].filter(([, role]) => role === "footnote-reference").map(([name]) => name),
+);
+
+/** Elements whose text is dropped as document metadata. */
+const METADATA: ReadonlySet<string> = new Set(
+  [...ELEMENT_ROLES].filter(([, role]) => role === "metadata").map(([name]) => name),
+);
+
+/**
+ * Raised when the source contains an element with no declared role. Carries
+ * enough context to classify it rather than merely reporting that it exists.
+ */
+export class UnknownElementError extends Error {
+  constructor(
+    readonly element: string,
+    readonly location: string,
+    readonly sample: string,
+  ) {
+    super(
+      `Unclassified source element <${element}> near ${location}. ` +
+        `Add it to ELEMENT_ROLES in src/usfx.ts with an explicit role before ingesting. ` +
+        `Sample: ${sample}`,
+    );
+    this.name = "UnknownElementError";
+  }
+}
 
 /**
  * Closes a bracket this edition opens and never shuts.
@@ -46,6 +132,32 @@ export interface Verse {
   readonly note: string | null;
 }
 
+/**
+ * Where a run of source text ended up, and how much of it there was.
+ *
+ * Counted rather than listed: the corpus holds about 750,000 text runs, and the
+ * invariant worth checking is arithmetic, not a transcript. Every character in
+ * the source is either emitted somewhere or dropped somewhere, and the totals
+ * have to agree. Text moving to the wrong destination shifts two counters; text
+ * vanishing breaks the sum.
+ */
+export interface CoverageLedger {
+  /** Characters routed to verse bodies, keyed by the element that carried them. */
+  readonly toVerses: ReadonlyMap<string, number>;
+  /** Characters routed to chapter superscriptions. */
+  readonly toTitles: ReadonlyMap<string, number>;
+  /** Characters routed to chapter subscriptions. */
+  readonly toSubscriptions: ReadonlyMap<string, number>;
+  /** Characters routed to verse notes. */
+  readonly toNotes: ReadonlyMap<string, number>;
+  /** Characters deliberately dropped, keyed by element — the lossy inventory. */
+  readonly dropped: ReadonlyMap<string, number>;
+  /** Characters seen outside any destination, e.g. whitespace between books. */
+  readonly unattributed: number;
+  /** Total characters across every text node in the source. */
+  readonly sourceCharacters: number;
+}
+
 export interface UsfxDocument {
   readonly verses: readonly Verse[];
   /**
@@ -62,6 +174,8 @@ export interface UsfxDocument {
   readonly subscriptions: ReadonlyMap<string, string>;
   /** Canonical book ids in document order, excluding front/back matter. */
   readonly books: readonly string[];
+  /** Proof that no source text disappeared silently. See {@link CoverageLedger}. */
+  readonly ledger: CoverageLedger;
 }
 
 const ENTITIES: ReadonlyMap<string, string> = new Map([
@@ -130,6 +244,23 @@ export function parseUsfx(xml: string): UsfxDocument {
   let titleBuffer: string | null = null;
   let titleOpenedAfterVerses = false;
   let selahBuffer: string | null = null;
+  let metadataDepth = 0;
+
+  // Ledger counters. `elementStack` names the element that actually carried a
+  // run of text, so a leak reports its source rather than merely its size.
+  const elementStack: string[] = [];
+  const toVerses = new Map<string, number>();
+  const toTitles = new Map<string, number>();
+  const toSubscriptions = new Map<string, number>();
+  const toNotes = new Map<string, number>();
+  const dropped = new Map<string, number>();
+  let unattributed = 0;
+  let sourceCharacters = 0;
+
+  const record = (bucket: Map<string, number>, length: number): void => {
+    const element = elementStack[elementStack.length - 1] ?? "(root)";
+    bucket.set(element, (bucket.get(element) ?? 0) + length);
+  };
 
   const tokenizer =
     /<\/?([A-Za-z0-9]+)((?:\s+[A-Za-z0-9:_.-]+\s*=\s*"[^"]*")*)\s*(\/?)>|([^<]+)/g;
@@ -138,16 +269,32 @@ export function parseUsfx(xml: string): UsfxDocument {
   while ((match = tokenizer.exec(source)) !== null) {
     const textRun = match[4];
     if (textRun !== undefined) {
-      if (discardDepth > 0 || footnoteRefDepth > 0) continue;
+      sourceCharacters += textRun.length;
+      if (discardDepth > 0 || footnoteRefDepth > 0 || metadataDepth > 0) {
+        record(dropped, textRun.length);
+        continue;
+      }
       const decoded = decodeEntities(textRun);
       if (footnoteDepth > 0) {
-        if (current !== null) current.note += decoded;
+        if (current !== null) {
+          current.note += decoded;
+          record(toNotes, textRun.length);
+        } else {
+          record(dropped, textRun.length);
+        }
       } else if (selahBuffer !== null) {
         selahBuffer += decoded;
+        record(toVerses, textRun.length);
       } else if (titleBuffer !== null) {
         titleBuffer += decoded;
+        record(titleOpenedAfterVerses ? toSubscriptions : toTitles, textRun.length);
       } else if (current !== null) {
         current.text += decoded;
+        record(toVerses, textRun.length);
+      } else {
+        // Whitespace between books and chapters, and the newline after every
+        // closing tag. Counted so the arithmetic still balances.
+        unattributed += textRun.length;
       }
       continue;
     }
@@ -157,6 +304,20 @@ export function parseUsfx(xml: string): UsfxDocument {
     const attrs = match[2] ?? "";
     const isClosing = match[0].startsWith("</");
     const isSelfClosing = match[3] === "/";
+
+    if (!ELEMENT_ROLES.has(name)) {
+      const at = book === "" ? "the document preamble" : `${book} ${chapter}`;
+      throw new UnknownElementError(name, at, source.slice(match.index, match.index + 120));
+    }
+
+    if (isClosing) elementStack.pop();
+    else if (!isSelfClosing) elementStack.push(name);
+
+    if (METADATA.has(name)) {
+      if (isClosing) metadataDepth = Math.max(0, metadataDepth - 1);
+      else if (!isSelfClosing) metadataDepth += 1;
+      continue;
+    }
 
     if (DISCARD.has(name)) {
       if (isClosing) discardDepth = Math.max(0, discardDepth - 1);
@@ -285,5 +446,14 @@ export function parseUsfx(xml: string): UsfxDocument {
     titles,
     subscriptions,
     books,
+    ledger: {
+      toVerses,
+      toTitles,
+      toSubscriptions,
+      toNotes,
+      dropped,
+      unattributed,
+      sourceCharacters,
+    },
   };
 }
