@@ -1,13 +1,17 @@
-# Disclosure
+# Outreach
 
-Findings go to the maintainer before the matrix is published. Correctness bugs
-are not vulnerabilities, but the courtesy is the same and it costs nothing — and
-the people best placed to adopt a shared contract are the people maintaining
-these APIs.
+The matrix is published for transparency, not criticism: every project in it is
+solving the same problem without a shared contract, and the divergence is the
+cost of that absence rather than anyone's carelessness. Where a specific
+behaviour would surprise a caller, the maintainer hears it from us first, freely
+and with nothing attached.
 
-| API | Unsafe findings | Action | Status |
+The people best placed to adopt a shared contract are the people maintaining
+these APIs. That is a reason to be useful to them, not to grade them.
+
+| API | Notable behaviour | Action | Status |
 |---|---|---|---|
-| labs.bible.org | 4 | [draft](./labs-bible-org.md) | not sent |
+| labs.bible.org / NET | 4 | [draft](./bible-org.md) — plus an approach about their translator notes | not sent |
 | bolls.life | 0 | courtesy note, optional | not sent |
 | bible-api.com | 0 | none needed | — |
 | rkeplin | 0 | none needed | — |

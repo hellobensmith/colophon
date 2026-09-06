@@ -54,7 +54,7 @@ const ELEMENT_ROLES: ReadonlyMap<string, ElementRole> = new Map([
   // Footnotes.
   ["f", "footnote"], ["ft", "footnote"], ["fqa", "footnote"], ["fq", "footnote"],
   ["fr", "footnote-reference"], ["fk", "footnote-reference"],
-  ["fv", "footnote-reference"],
+  ["fv", "footnote-reference"], ["fl", "footnote-reference"],
 
   // Cross-references: captured nowhere in v1, so dropped with their subtree.
   ["x", "discard"], ["xo", "discard"], ["xt", "discard"],

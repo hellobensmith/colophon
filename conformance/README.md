@@ -1,7 +1,14 @@
 # Scripture API conformance suite
 
-Asks the same semantic questions of several public Scripture APIs and records
-how each one answers.
+Asks the same semantic questions of several public Scripture APIs and records how
+each one answers.
+
+Published for transparency, not criticism. Every project measured here is solving
+the same problem without a shared contract to work from, and each reached
+reasonable answers that happen not to agree. The divergence is the cost of that
+absence — and the clearest argument that a shared contract would be worth having.
+This project's own API is a subject in the table, and the suite found a gap in it
+too.
 
 ```bash
 bun conformance/run.ts              # replay from cache, fetch what is missing
