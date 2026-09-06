@@ -3,6 +3,18 @@
 Short on purpose. These are the things a future session cannot re-derive by
 reading the code quickly, and which are expensive to get wrong.
 
+**Start by reading `docs/STATE.md`** — where the project is, what is next, which
+decisions are already settled and why, and the facts that were costly to
+establish. It exists so nothing here has to be worked out twice.
+
+## What this is for
+
+Not a Bible API. A standard and a reference implementation good enough that
+anyone holding a Scripture text — including a copyright holder no aggregator can
+serve — can run it themselves, on their own infrastructure, without asking
+permission. The project is free and ungatekept precisely because it holds
+nobody's text.
+
 ## Identity
 
 Two identifiers, never conflated:
@@ -51,6 +63,19 @@ label must retire caches but must not invalidate a saved coordinate.
 - Terms are ANDed, so `total` means what it says.
 - Ranking literal matches above morphological relatives was tried and rejected —
   it buried `spake`, `saith` and `went`. See the README.
+
+## Conformance
+
+`conformance/` measures seven public Scripture APIs against the same semantic
+questions. It is published for transparency, not criticism: every project in it
+is solving the same problem without a shared contract, and this project's API is
+a subject in the table rather than the judge.
+
+Two rules keep it honest, both learned the hard way. An adapter must never tidy
+away behaviour — passing markup through unchanged is the point. And read the
+target's own documentation before reporting anything: a finding against
+bolls.life was withdrawn on discovering their ASV is titled "with Strong's
+numbers", so the markup was the advertised product.
 
 ## Measurement
 

@@ -6,6 +6,10 @@ Protestant, Catholic, and Orthodox Greek canons.
 
 The ASV is public domain. So is this data. Nothing here costs money to run.
 
+**Working on this?** `docs/STATE.md` carries the current phase, the decisions
+already settled and why, and the facts that were costly to establish.
+`CLAUDE.md` carries the invariants that must not be violated.
+
 ## How it works
 
 The whole Bible — 31,102 verses — is compiled into the Worker itself. A request
