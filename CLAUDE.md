@@ -1,4 +1,4 @@
-# bible-api — durable invariants
+# Colophon — durable invariants
 
 Short on purpose. These are the things a future session cannot re-derive by
 reading the code quickly, and which are expensive to get wrong.
@@ -9,7 +9,7 @@ establish. It exists so nothing here has to be worked out twice.
 
 ## What this is for
 
-Not a Bible API. A standard and a reference implementation good enough that
+Colophon is not merely a Bible API. It is a standard and a reference implementation good enough that
 anyone holding a Scripture text — including a copyright holder no aggregator can
 serve — can run it themselves, on their own infrastructure, without asking
 permission. The project is free and ungatekept precisely because it holds

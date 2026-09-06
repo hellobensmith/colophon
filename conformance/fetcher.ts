@@ -17,7 +17,7 @@ import { mkdir } from "node:fs/promises";
 const CACHE_DIR = new URL("./.cache/", import.meta.url).pathname;
 
 const USER_AGENT =
-  "scripture-conformance/0.1 (+https://github.com/hellobensmith/bible-api; " +
+  "colophon-conformance/0.1 (+https://github.com/hellobensmith/colophon; " +
   "measuring Scripture API behaviour; contact via repository issues)";
 
 /** Minimum gap between two requests to the same host. */

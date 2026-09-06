@@ -26,7 +26,7 @@ export const DEMO_HTML = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Canon-Aware Bible API — American Standard Version</title>
+<title>Colophon — American Standard Version</title>
 <meta name="description" content="The complete American Standard Version (1901) as a REST API: reference parsing, ranked search, and three canon traditions.">
 <link rel="icon" href="${FAVICON}">
 <style>
@@ -292,11 +292,12 @@ export const DEMO_HTML = `<!doctype html>
 <header class="masthead">
   <div class="shell stack">
     <p class="eyebrow">Public domain &middot; American Standard Version, 1901</p>
-    <h1>Canon-Aware Bible API</h1>
+    <h1>Colophon</h1>
     <p class="lede">
-      All 31,102 verses, compiled into a Cloudflare Worker. There is no database,
-      so a request performs no I/O &mdash; a verse lookup is a string slice, and
-      search runs over an index built at compile time.
+      A Scripture API with no key, no account and no gatekeeper. All 31,102 verses
+      of the ASV compiled into a Cloudflare Worker, so a request performs no I/O.
+      A colophon is the note at the end of a manuscript saying who made it and
+      from what &mdash; every response here tells you exactly which text you hold.
     </p>
     <p class="status" id="status" data-state="checking">Checking the API&hellip;</p>
     <dl class="facts">

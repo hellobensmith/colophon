@@ -22,7 +22,7 @@ const valueOf = (flag: string): string | null => {
 
 const options = { cachedOnly: args.has("--cached"), refresh: args.has("--refresh") };
 const only = valueOf("--only");
-const ourBase = valueOf("--base") ?? "https://bible-api.hellobensmith.workers.dev";
+const ourBase = valueOf("--base") ?? "https://colophon.hellobensmith.workers.dev";
 
 const adapters = allAdapters(options, ourBase).filter((a) => only === null || a.id === only);
 

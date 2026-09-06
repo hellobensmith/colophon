@@ -85,7 +85,18 @@ const NOT_FOUND_KINDS: ReadonlySet<ParseErrorKind> = new Set<ParseErrorKind>([
 
 const app = new Hono();
 
-app.use("*", cors({ origin: "*", allowMethods: ["GET", "OPTIONS"] }));
+app.use(
+  "*",
+  cors({
+    origin: "*",
+    allowMethods: ["GET", "OPTIONS"],
+    // Without this a browser client cannot read the identity headers at all —
+    // only the CORS-safelisted set is exposed by default, so the two headers
+    // that exist for callers to use would be invisible to the callers who most
+    // need them.
+    exposeHeaders: ["x-generation-id", "x-revision-id"],
+  }),
+);
 
 /**
  * Both identities travel on every response. A client caching by `x-generation-id`

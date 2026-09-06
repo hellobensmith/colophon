@@ -1,8 +1,30 @@
-# Canon-Aware Bible API
+# Colophon
 
-The complete American Standard Version (1901) as a REST API: natural-language
-reference parsing, ranked full-text search, and book metadata for the
-Protestant, Catholic, and Orthodox Greek canons.
+A Scripture API you can call today, and a reference implementation you can run
+with your own text tomorrow.
+
+The live instance serves the complete American Standard Version (1901): natural
+-language reference parsing, ranked full-text search, and book metadata for the
+Protestant, Catholic and Orthodox Greek canons. No key, no account, no rate-limit
+tier, CORS open to everyone.
+
+```bash
+curl 'https://colophon.hellobensmith.workers.dev/passages?ref=Psalm+23'
+curl 'https://colophon.hellobensmith.workers.dev/search?q=good+shepherd'
+```
+
+```js
+const res = await fetch(
+  "https://colophon.hellobensmith.workers.dev/passages?ref=" +
+    encodeURIComponent("John 3:16"),
+);
+const { reference, verses } = await res.json();
+```
+
+A colophon is the note at the end of a manuscript saying who made it, when, and
+from what. That is the commitment: every response carries an edition, a revision
+and a generation identifier, so you always know exactly which text you are
+holding.
 
 The ASV is public domain. So is this data. Nothing here costs money to run.
 

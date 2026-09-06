@@ -292,8 +292,8 @@ export function ours(options: FetchOptions, base: string): Adapter {
 
   return {
     id: "ours",
-    name: "bible-api (this project)",
-    homepage: "https://github.com/hellobensmith/bible-api",
+    name: "Colophon (this project)",
+    homepage: "https://github.com/hellobensmith/colophon",
     edition: "asv",
     capabilities: caps(
       "freeform-reference",

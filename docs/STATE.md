@@ -1,6 +1,6 @@
 # State — read this first
 
-Last updated 5 September 2026 · commit `ecfa75e` · 15 commits · working tree clean
+Last updated 5 September 2026 · public repo · working tree clean
 
 This file exists so a new session does not have to re-derive anything. Everything
 below was measured or verified; nothing here is recalled.
@@ -9,7 +9,7 @@ below was measured or verified; nothing here is recalled.
 
 ## What exists
 
-**A deployed API.** <https://bible-api.hellobensmith.workers.dev> — the complete
+**A deployed API.** <https://colophon.hellobensmith.workers.dev> — the complete
 ASV 1901, 31,102 verses, embedded in a Cloudflare Worker with no database.
 Reference parsing, ranked search, three canon traditions, Hebrew and Greek psalm
 numbering, a demo page at `/`.
@@ -24,7 +24,7 @@ transparency, not criticism.
 | Contract | 43/43 responses conform to `openapi.yaml` |
 | Bundle | 1,939 KiB gzip against a 3 MB free-tier limit |
 | Production CPU | 4 ms median, 8 ms peak, against 10 ms |
-| Repo | `github.com/hellobensmith/bible-api`, **private** |
+| Repo | `github.com/hellobensmith/colophon`, **public** |
 
 ```bash
 bun test                    # 149 tests, no network
@@ -145,19 +145,21 @@ the six external APIs do no reference parsing at all. Full matrix in
 
 ---
 
+## Settled since
+
+**The name is Colophon** — the note at the end of a manuscript recording who made
+it, when and from what. It names the project's central commitment: every response
+carries edition, revision and generation identifiers, so a caller always knows
+which text it is holding. Repo, Worker, package and docs all renamed; the old
+`bible-api` Worker is retired.
+
 ## Open questions
 
-1. **The project has no name.** Recommendation on the table: **Colophon** — the
-   statement at the end of a manuscript saying who made it and from what, which
-   is the project's central commitment. Alternatives considered: Stephanus (who
-   invented verse numbers in 1551), Ambo, Apparatus.
-2. **Send the Bible.org outreach?** Drafted and unsent at
+1. **Send the Bible.org outreach?** Drafted and unsent at
    `conformance/outreach/bible-org.md`. It leads with their translator notes and
    offers the API findings underneath, freely.
-3. **Publish the matrix** — after the outreach, with a two-week window.
-4. **Make the repo public?** Currently private. Nothing in it is sensitive; the
-   scan found only the word "secrets" in prose.
-5. **Should the conformance suite become the front door** — a service any API
+2. **Publish the matrix** — after the outreach, with a two-week window.
+3. **Should the conformance suite become the front door** — a service any API
    runs against itself — rather than a file in this repository?
 
 ---

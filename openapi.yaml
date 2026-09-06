@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Canon-Aware Bible API
+  title: Colophon
   version: 1.0.0
   description: |
     The complete American Standard Version (1901), public domain, served from
