@@ -312,10 +312,22 @@ const psalmSuperscription: Probe = {
     if (outcome.transportError !== null) return unreachable(outcome, how);
     const text = outcome.verses[0]?.text ?? "";
     if (text === "") return { verdict: "unreachable", summary: "no text returned", request: how, evidence: null };
-    const foldedIn = /psalm of david/i.test(text);
-    const isVerseOne = /shepherd/i.test(text);
+    // A superscription inside its own element is delimited, not merged: a
+    // client rendering the markup still shows a heading. Only an undelimited
+    // run-on genuinely loses the distinction.
+    const delimited = /<(sup|h\d|span|i|em)[^>]*>[^<]*psalm of david/i.test(text);
+    const plain = text.replace(/<[^>]*>/g, "");
+    const foldedIn = /psalm of david/i.test(plain);
+    const isVerseOne = /shepherd/i.test(plain);
     if (foldedIn && isVerseOne) {
-      return { verdict: "unsafe", summary: "superscription folded into verse 1", request: how, evidence: excerpt(text, 80) };
+      return {
+        verdict: delimited ? "divergent" : "unsafe",
+        summary: delimited
+          ? "superscription inside verse 1, delimited by markup"
+          : "superscription folded into verse 1",
+        request: how,
+        evidence: excerpt(text, 80),
+      };
     }
     if (!isVerseOne) {
       return { verdict: "divergent", summary: "verse 1 is not the expected line", request: how, evidence: excerpt(text, 80) };
@@ -374,6 +386,14 @@ const markupLeakage: Probe = {
     if (outcome.transportError !== null) return unreachable(outcome, how);
     const text = outcome.verses[0]?.text ?? "";
     if (text === "") return { verdict: "unreachable", summary: "no text returned", request: how, evidence: null };
+    if (adapter.textCarriesMarkup === true) {
+      return {
+        verdict: "not-applicable",
+        summary: "edition declares inline markup (Strong's numbers)",
+        request: how,
+        evidence: excerpt(text, 70),
+      };
+    }
     const tags = text.match(/<[^>]+>/g);
     if (tags !== null) {
       return {

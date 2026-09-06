@@ -164,13 +164,39 @@ describe("textual-integrity probes", () => {
     expect((await probe("psalm-superscription").run(adapter)).verdict).toBe("divergent");
   });
 
-  test("markup inside verse text is unsafe", async () => {
+  test("markup inside verse text is unsafe when the edition does not declare it", async () => {
     const adapter = fake({
       verse: () => outcome(200, [verse("JHN", 3, 16, "For<S>1063</S> God<S>2316</S> so loved")]),
     });
     const result = await probe("markup-leakage").run(adapter);
     expect(result.verdict).toBe("unsafe");
     expect(result.summary).toContain("markup");
+  });
+
+  /**
+   * bolls.life offers the ASV only as "American Standard Version 1901 (with
+   * Strong's numbers)". An earlier run reported its markup as leakage, which
+   * would have meant emailing a maintainer to complain that the feature they
+   * advertise is present. An edition that declares markup is not judged on it.
+   */
+  test("a declared markup edition is not judged for containing markup", async () => {
+    const adapter = fake({
+      verse: () => outcome(200, [verse("JHN", 3, 16, "For<S>1063</S> God<S>2316</S> so loved")]),
+    });
+    const declared: Adapter = { ...adapter, textCarriesMarkup: true };
+    const result = await probe("markup-leakage").run(declared);
+    expect(result.verdict).toBe("not-applicable");
+    expect(result.summary).toContain("declares");
+  });
+
+  test("a superscription delimited by markup is divergent, not unsafe", async () => {
+    const adapter = fake({
+      verse: () =>
+        outcome(200, [verse("PSA", 23, 1, "<sup>A Psalm of David.</sup> Jehovah is my shepherd")]),
+    });
+    const result = await probe("psalm-superscription").run(adapter);
+    expect(result.verdict).toBe("divergent");
+    expect(result.summary).toContain("delimited");
   });
 
   test("losing the ASV's divine name is unsafe", async () => {

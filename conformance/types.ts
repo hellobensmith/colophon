@@ -54,6 +54,13 @@ export interface Adapter {
   readonly homepage: string;
   /** Which of the ASV-bearing editions this adapter is pointed at, if any. */
   readonly edition: string;
+  /**
+   * True when the edition served is *declared* to carry inline markup — bolls
+   * offers the ASV only as "American Standard Version 1901 (with Strong's
+   * numbers)", so tags in its verse text are the product, not a defect. Probes
+   * that would otherwise read markup as leakage must skip such an edition.
+   */
+  readonly textCarriesMarkup?: boolean;
   readonly capabilities: ReadonlySet<Capability>;
 
   /** Resolve a reference exactly as a person would type it. */

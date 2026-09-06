@@ -117,8 +117,8 @@
     {
       "adapter": "ours",
       "probe": "declares-licence",
-      "verdict": "missing",
-      "summary": "no licence or provenance stated",
+      "verdict": "safe",
+      "summary": "states licence or copyright",
       "request": "self-description",
       "evidence": null
     },
@@ -429,8 +429,8 @@
     {
       "adapter": "bolls.life",
       "probe": "psalm-superscription",
-      "verdict": "unsafe",
-      "summary": "superscription folded into verse 1",
+      "verdict": "divergent",
+      "summary": "superscription inside verse 1, delimited by markup",
       "request": "PSA 23:1",
       "evidence": "<sup>A Psalm of David.</sup> Jehovah<S>3068</S> is my shepherd<S>7462</S>; I sha…"
     },
@@ -445,10 +445,10 @@
     {
       "adapter": "bolls.life",
       "probe": "markup-leakage",
-      "verdict": "unsafe",
-      "summary": "44 markup tag(s) inside the text",
+      "verdict": "not-applicable",
+      "summary": "edition declares inline markup (Strong's numbers)",
       "request": "JHN 3:16",
-      "evidence": "For<S>1063</S> God<S>2316</S> so<S>3779</S> loved<S>25</S> the world<S>2889</S>, that<S>56…"
+      "evidence": "For<S>1063</S> God<S>2316</S> so<S>3779</S> loved<S>25</S> the world<S…"
     },
     {
       "adapter": "bolls.life",

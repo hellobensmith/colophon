@@ -139,7 +139,10 @@ export function bollsLife(options: FetchOptions): Adapter {
     id: "bolls.life",
     name: "bolls.life",
     homepage: "https://bolls.life",
+    // The only ASV bolls offers is titled "American Standard Version 1901 (with
+    // Strong's numbers)", so its verse text carries markup by design.
     edition: "asv",
+    textCarriesMarkup: true,
     capabilities: caps("structured-verse", "range", "self-description"),
     verse: (usfm, chapter, verse) =>
       fetchIt(`https://bolls.life/get-verse/ASV/${book(usfm).ordinal}/${chapter}/${verse}/`, chapter, usfm),
