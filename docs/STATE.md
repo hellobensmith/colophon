@@ -22,8 +22,8 @@ transparency, not criticism.
 |---|---|
 | Tests | 178 across 11 files |
 | Contract | 48/48 responses conform to `openapi.yaml` |
-| Bundle | 1,939 KiB gzip against a 3 MB free-tier limit |
-| Production CPU | 4 ms median, 8 ms peak, against 10 ms |
+| Bundle | 1,940 KiB gzip against a 10 MB limit (paid plan; the 3 MB figure is free-tier) |
+| Production CPU | 6 ms median overall; 16-21 ms median on long phrase searches, 33 ms peak. No CPU cap enforced. |
 | Repo | `github.com/hellobensmith/colophon`, **public** |
 
 ```bash
@@ -82,31 +82,32 @@ answer different questions, so both are kept: `CANON_ORDER` for traditions,
 `canonPosition()`. `src/edition.test.ts` asserts the two orders *disagree* about
 Tobit, so a future collapse of one into the other fails loudly.
 
-**And the architecture does not fit.** See the bundle ceiling below: two
-translations measure ~4.01 MB against a 3 MB limit, and rebuilding the search
-index at startup does not rescue it either. Phase 1 was built to find this and
-it found it.
+**And the architecture holds.** The earlier conclusion in this session — that
+two translations would not fit — was drawn against the free plan's 3 MB limit,
+which does not apply to this account. Verified by deploying a 5.94 MB throwaway
+Worker: the limit is 10 MB, two translations come to ~4.01 MB, and no
+architectural change is needed. See the bundle limit below.
 
-### The open architecture question
+### What Phase 1 still has to build
 
-Recommended: **one Worker per translation**, with a router in front.
+The plumbing, unchanged from the original plan and now confirmed necessary by
+measurement rather than assumed:
 
-This is not a workaround for the ceiling; it is the deployment model the project
-already describes. A publisher holding their own text embeds it in their own
-Worker inside the free tier, keeping the measured zero-I/O profile, and scales
-without limit because each publisher brings their own budget. The router then
-becomes federation rather than a scaling hack, which also feeds the open question
-about the conformance suite becoming a service.
+- Data keyed by `(translation, book)`. **32 of 66 shared books differ in
+  versification**, so `VERSE_COUNTS`, `BOOK_START`, `CHAPTER_OFFSET`,
+  `sequenceOf` and `locate` all become per-translation. There is no shared
+  skeleton to share.
+- A `?translation=` parameter defaulting to `asv`, so nothing existing breaks.
+- `data_availability` per `(translation, book)` — the DRA supplies exactly the
+  seven books the ASV reports as `metadata_only`.
+- Ingest must tolerate a source with **no `<d>` titles and no footnotes**. The
+  ASV path assumes both exist.
+- `build:data` and `validate.ts` currently hard-code the ASV source URL and its
+  assertions; both need to run per translation.
 
-The alternatives were weighed and lose against the project's own premise:
-
-| Option | Why not |
-|---|---|
-| Paid Workers plan | 10 MB buys ~5 translations against a catalogue of 1,294, and makes the reference implementation need a paid account — against "free and ungatekept" |
-| Text in R2 | Undoes the measured no-database decision and makes a self-hosting publisher provision a stateful bucket before serving their own text |
-
-**Unmeasured and load-bearing:** whether a service-binding hop keeps a
-cross-translation request inside the 10 ms budget. Measure before committing.
+The per-Worker federation idea is worth keeping as a *vision* question — it is
+how a publisher self-hosts their own text — but it is no longer forced by any
+ceiling, and Phase 1 should not wait on it.
 
 ---
 
@@ -117,10 +118,10 @@ Re-litigating these wastes time. Each was measured, not chosen by taste.
 | Decision | Reason |
 |---|---|
 | **No database** | The corpus is 31,102 rows fixed in 1901: no writes, no concurrency, no growth. Embedding measured 1.93 MB gzip / 4 ms CPU with zero I/O. A DB adds a round trip to one region to solve a problem we do not have. |
-| **Embedded, not R2** | Same measurement. The prediction that R2 becomes right at translation 3 was wrong: measured on 7 September, the ceiling arrives at translation **2**. See the ceiling below, and the open architecture question. |
+| **Embedded, not R2** | Same measurement, and it survives the second translation: the limit is 10 MB, not the 3 MB assumed here, so two translations fit at ~4.01 MB with room for about four more. R2 is not needed for Phase 1. |
 | **Search stays in v1** | A build brief we evaluated forbids it. We measured the alternative and kept it; the morphology work is the most-used feature. |
 | **Greek/Hebrew psalm numbering synthesized** | That brief forbids synthesizing versification the source does not carry. We built it anyway, verified it as a bijection over 2,577 positions, and then confirmed it externally against Douay-Rheims. |
-| **Platform cache, not the Cache API** | `[cache] enabled` in `wrangler.toml` serves hits *without running the Worker*: measured 7 of 8 identical requests never invoked it. A deploy invalidates it automatically, which is what makes `immutable` safe. The in-Worker Hono middleware was removed as redundant. |
+| **Platform cache, not the Cache API** | Measured again 7 September: 8 identical requests gave 1 MISS and 7 HITs, invoking the Worker once. The mechanism recorded here was wrong, though — `[cache] enabled` is not a wrangler field and was silently ignored; the caching comes from the Worker's own `Cache-Control: immutable` and Cloudflare's default edge caching. The dead key has been removed. A deploy invalidates it automatically, which is what makes `immutable` safe. The in-Worker Hono middleware was removed as redundant. |
 | **Exact-form search ranking rejected** | Built and measured. It fixed the four homographs but pushed `spake`, `saith` and `went` out of the top 20 entirely, and roughly doubled CPU. `spake` outnumbers `speak` in this translation, so the trade loses. |
 | **Query cost cap rejected** | Built to refuse expensive searches, priced from the shipped document frequencies, and removed the same day. The costliest query the index can express prices at 135,841; "and it came to pass in the days of the king" prices at 99,444. No threshold separates them, and it was refusing `?q=the`, which the spec documents. What it guarded against is a one-time posting-cache warm per isolate, not a repeatable amplification. Deduplicating terms and capping at twelve is the whole fix. |
 | **Tradition order and edition order are different facts** | `/books?tradition=catholic` keeps the USCCB's NABRE interleaving, because that answers "what is the Catholic canon". The DRA's own after-Malachi order is carried as edition metadata, because that answers "how does this edition print". Collapsing them into one field forces a wrong answer to one of the two questions. |
@@ -148,9 +149,14 @@ understated CPU by that factor. Use `wrangler tail --format json` and read
 `cpuTime`; never quote a local `performance.now()` as production CPU. Cold-start
 cost lands on whichever request an isolate serves first, whatever that request is.
 
-**The bundle ceiling — two translations do not fit.** Corrected 7 September
-2026; the earlier estimate here assumed the DRA costs what the ASV costs, and it
-does not. Measured per file, against the deployed 1,939 KiB:
+**The bundle limit is 10 MB, not 3 MB — two translations fit.** This corrects a
+conclusion drawn earlier the same day from the wrong premise. Verified
+empirically on 7 September by deploying a throwaway Worker padded with
+incompressible data: **5.94 MB gzip uploaded and deployed successfully**, and a
+3.26 MB one before it. The 3 MB figure is the *free* plan's; this account is not
+on it. The throwaway was deleted.
+
+Measured composition, against the deployed 1,940 KiB:
 
 | | gzip |
 |---|---|
@@ -160,21 +166,36 @@ does not. Measured per file, against the deployed 1,939 KiB:
 | **deployed today** | **1.89 MB** |
 | DRA text plus offsets | 1.39 MB |
 | DRA search index, scaled from the ASV's | ~0.73 MB |
-| **two translations** | **~4.01 MB** against 3 MB |
+| **two translations** | **~4.01 MB against 10 MB** |
 
 The DRA is the larger text — 4.40 MB raw against the ASV's 3.92 MB — and gzips
-to 1.34 MB against 1.16 MB. Text and offsets alone put the bundle at 3.28 MB,
-over the limit before any DRA search index exists.
+to 1.34 MB against 1.16 MB, so it costs more than the ASV rather than the same.
+That much was right. What was wrong was the ceiling it was measured against.
 
-**Rebuilding the index at startup does not rescue it.** The 180 ms recorded here
-was a local number, and this file's own rule says production runs roughly four
-times slower. The DRA index measured 282 ms locally to build, so ~1.13 s in
-production for one translation and ~1.85 s for two, against a 1,000 ms budget.
-The 4x is inferred from the rule rather than measured in production; measuring it
-needs a deploy.
+**So Phase 1 needs no architectural change.** Keep the corpus embedded, keep the
+search index shipped rather than rebuilt at startup, and add the DRA. Roughly six
+MB of headroom remains — about four more translations at this size.
 
-So the embedded-corpus decision, which was right for one translation and still
-is, does not survive the second. That is what Phase 1 was for.
+**Production CPU is higher than this file recorded.** Measured 7 September with
+`wrangler tail`, cache-busted so every request reached the Worker:
+
+| Request | min | median | max |
+|---|---|---|---|
+| `?q=good shepherd` | 0 | 2 | 5 |
+| `?ref=Psalm 119:1-176` | 1 | 6 | 6 |
+| `?q=the` | 4 | 6 | 9 |
+| `?q=and it came to pass in the days of the king` | 4 | 16 | 33 |
+| `?q=` twelve commonest words | 7 | 21 | 31 |
+
+All 31 outcomes were `ok`; nothing was terminated. **There is no 10 ms
+enforcement on this account**, which is the other half of not being on the free
+plan. The earlier "4 ms median, 8 ms peak against 10 ms" understates ordinary
+traffic: a long phrase search costs 16-21 ms median.
+
+The variance is isolate churn, not query cost — requests land on many isolates
+across colos, and each new one pays the posting-cache warm. That is also why the
+same query reads 4 ms and 33 ms minutes apart, and why the local "it caches away"
+observation is weaker in production than on one laptop process.
 
 **The eBible catalogue** (`translations.csv`): 1,294 redistributable translations
 across 1,024 languages, ~15M verses, ~2 GB. Only **111** are outright public
