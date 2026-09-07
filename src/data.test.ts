@@ -220,3 +220,39 @@ describe("search index", () => {
     }
   });
 });
+
+describe("total means what it says", () => {
+  /**
+   * The scan cap truncates the seed, and every other term filters that seed —
+   * so a truncated seed undercounts a multi-term result rather than merely
+   * approximating it. At the old cap of 6,000 this query reported 313 against a
+   * true 345, while the README promises terms are ANDed and `total` means what
+   * it says. See the comment on MAX_POSTINGS_SCANNED.
+   */
+  test("a query of common words is counted exactly, not truncated", () => {
+    const outcome = search("the and of that unto shall", 20, 0);
+    expect(outcome.truncated).toBe(false);
+    expect(outcome.total).toBe(345);
+  });
+
+  test("and the count matches the verses actually returned", () => {
+    // Guards the other direction: an exact total is worthless if it disagrees
+    // with the result set it describes. Asking for more than the total should
+    // yield exactly the total, with no duplicates.
+    //
+    // Note this cannot assert that each hit literally contains each term —
+    // terms match through morphological families, so a hit for "shall" may
+    // carry "shalt". That is the feature, and morphology.test.ts covers it.
+    const outcome = search("the and of that unto shall", 1_000, 0);
+    expect(outcome.hits).toHaveLength(outcome.total);
+    expect(new Set(outcome.hits.map((hit) => hit.id)).size).toBe(outcome.total);
+  });
+
+  test("only a bare function word still truncates", () => {
+    // The safety valve is meant to be unreachable by ordinary queries.
+    expect(search("the", 5, 0).truncated).toBe(true);
+    for (const query of ["and", "God", "good shepherd", "the and", "Jehovah"]) {
+      expect(search(query, 5, 0).truncated).toBe(false);
+    }
+  });
+});

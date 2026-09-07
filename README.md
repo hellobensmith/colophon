@@ -53,9 +53,14 @@ postings it touches. Everything after that runs in 0–4 ms.
 
 Repeat requests cost no CPU at all. `[cache] enabled` in `wrangler.toml` puts a
 cache in front of the Worker, so a hit is served without running it — measured at
-7 of 8 identical requests never reaching the Worker. Deploying invalidates that
-cache automatically, which is what makes the `immutable` header on verse data
-safe: new data cannot be masked by a stale entry.
+7 of 8 identical requests never reaching the Worker. Deploying does **not** invalidate that cache. This was
+measured on 7 September 2026, and it had been documented the other way round: a
+response cached before a deploy was still served afterwards, from a Worker
+version no longer deployed, while a cache-busted request to the same path
+returned the new answer. Verse data is therefore cached for a day rather than
+the year of `immutable` it used to claim, so a correction propagates on its own.
+Every response carries `x-generation-id`, so a caller can always tell which
+build its copy came from.
 
 A cache hit still counts against the free plan's 100,000 requests/day, so
 requests, not CPU, are the limit you would reach first.
@@ -160,7 +165,7 @@ suite checks live responses against it.
 
 Passages are capped at 500 verses and return 413 above that. Search needs at
 least 2 characters and returns at most 100 results. Verse data is served
-`immutable`; book lists last a day; search results last a minute.
+a day; book lists last a day; search results last a minute.
 
 ## Search
 

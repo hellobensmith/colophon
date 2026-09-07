@@ -50,7 +50,28 @@ const MAX_INPUT_LENGTH = 512;
 const DEFAULT_SEARCH_LIMIT = 20;
 const MIN_QUERY_LENGTH = 2;
 
-const IMMUTABLE = "public, max-age=31536000, immutable";
+/**
+ * Verse data changes only when the corpus is rebuilt, so it *wants* to be
+ * immutable — but a year of `immutable` was justified by a mechanism that does
+ * not exist.
+ *
+ * README and docs/STATE.md both claimed a deploy invalidates the platform
+ * cache, "which is what makes the immutable header safe". Measured 7 September
+ * 2026: it does not. A response cached before a deploy was still being served
+ * afterwards, from a Worker version no longer deployed, while a cache-busted
+ * request to the same path returned the new answer. With `immutable` and a year
+ * of `max-age`, a corrected verse or a fixed footnote could stay masked for
+ * that year, and the caller would have no reason to revalidate.
+ *
+ * A day is the compromise: still cheap — one invocation per URL per day, and
+ * the measured hit rate was 7 of 8 within seconds — but a correction now
+ * propagates on its own. Every response still carries `x-generation-id`, so a
+ * caller holding a stale copy can always tell which build it came from.
+ *
+ * Raising this again means first making a deploy actually purge, which
+ * workers.dev has no zone to do, or moving the generation id into the URL.
+ */
+const VERSE_DATA = "public, max-age=86400";
 const DAILY = "public, max-age=86400";
 const BRIEF = "public, max-age=60";
 
@@ -256,7 +277,7 @@ app.get("/books/:id/chapters/:num", (context) => {
     });
   }
 
-  context.header("Cache-Control", IMMUTABLE);
+  context.header("Cache-Control", VERSE_DATA);
   return context.json({
     id: `${id}.${chapter}`,
     book_id: id,
@@ -324,7 +345,7 @@ app.get("/passages", (context) => {
     }
   }
 
-  context.header("Cache-Control", IMMUTABLE);
+  context.header("Cache-Control", VERSE_DATA);
   return context.json({
     reference: parsed.reference,
     translation: TRANSLATION,

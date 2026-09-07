@@ -21,19 +21,34 @@ const B = 0.75;
 /**
  * Ceiling on postings materialized for the most selective term.
  *
- * Cloudflare's free plan allows 10 ms of CPU per request. This figure is tuned
- * against CPU measured on the deployed Worker rather than a laptop: production
- * isolates ran roughly four times slower than local benchmarking suggested, and
- * an earlier cap of 12,000 put "the" at 13 ms in production while local tests
- * reported 3 ms.
+ * Raised from 6,000 to 25,000 on 7 September 2026, for correctness rather than
+ * speed. Two things this comment previously claimed turned out to be false.
  *
- * At 6,000 the only single words that truncate are function words — "the",
- * "and", "of", "unto", "shall" — which carry almost no ranking signal anyway.
- * Words that actually mean something stay exact: "Jehovah" (5,821 verses) is
- * the most common of them and sits just inside the cap. Any query of two or
- * more terms is exact regardless, since the rarest term seeds the search.
+ * The first was that "any query of two or more terms is exact regardless".
+ * It is not. The cap truncates the *seed*, and every other term filters that
+ * seed — so a truncated seed silently undercounts the result. Measured at
+ * 6,000, `the and of that unto shall` reported `total: 313` when the true
+ * answer is 345. The README says terms are ANDed and `total` means what it
+ * says, so that was a wrong answer, not a documented approximation.
+ *
+ * The second was the budget itself: this was tuned against "Cloudflare's free
+ * plan allows 10 ms of CPU per request", and that plan is not the one this
+ * account is on. No CPU cap is enforced. See docs/STATE.md.
+ *
+ * Raising it is also *faster* on the queries that matter, which is the
+ * counter-intuitive part. `the and of that unto shall` went from 13.9 ms to
+ * 3.1 ms, because a truncated seed leaves a large candidate set for every
+ * later term to filter, while `seedPostings` — unlike `postingsAt` — never
+ * caches a partial decode, so the work is repeated rather than reused.
+ *
+ * What still truncates at 25,000 is `the` alone, whose prefix expansion spans
+ * some 47,000 postings across `the`, `thee`, `their`, `them`, `then` and
+ * `there`. A single function word matching five verses in six carries no
+ * information, and `truncated: true` is the honest answer for it. That is now
+ * the only shape that reaches this cap, which makes it a safety valve rather
+ * than a routine approximation.
  */
-const MAX_POSTINGS_SCANNED = 6_000;
+const MAX_POSTINGS_SCANNED = 25_000;
 
 /** Ceiling on how many index terms one prefix wildcard may expand to. */
 const MAX_PREFIX_EXPANSIONS = 64;

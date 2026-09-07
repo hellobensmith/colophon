@@ -250,8 +250,12 @@ if (!attached) {
   const headerProbe = await fetch(`${BASE}/passages?ref=John%203:16`);
   await headerProbe.arrayBuffer();
   const cacheControl = headerProbe.headers.get("cache-control") ?? "";
+  // Deliberately asserts the header is cacheable but NOT immutable: a deploy
+  // does not purge this cache, so an immutable year would mask a correction
+  // for a year. See the comment on VERSE_DATA in src/index.ts.
+  const maxAge = Number(cacheControl.match(/max-age=(\d+)/)?.[1] ?? 0);
   report(
-    cacheControl.includes("immutable") && cacheControl.includes("max-age="),
+    maxAge > 0 && maxAge <= 86_400 && !cacheControl.includes("immutable"),
     "cache-control header",
     cacheControl === "" ? "absent" : cacheControl,
   );
