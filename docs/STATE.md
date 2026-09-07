@@ -20,14 +20,14 @@ transparency, not criticism.
 
 | | |
 |---|---|
-| Tests | 178 across 11 files |
-| Contract | 48/48 responses conform to `openapi.yaml` |
+| Tests | 186 across 12 files |
+| Contract | 54/54 responses conform to `openapi.yaml` |
 | Bundle | 1,940 KiB gzip against a 10 MB limit (paid plan; the 3 MB figure is free-tier) |
 | Production CPU | 6 ms median overall; 16-21 ms median on long phrase searches, 33 ms peak. No CPU cap enforced. |
 | Repo | `github.com/hellobensmith/colophon`, **public** |
 
 ```bash
-bun test                    # 178 tests, no network
+bun test                    # 186 tests, no network
 bun run typecheck           # tsc, strict
 bun run build:data          # re-ingest; refuses to emit on any failed assertion
 bun run dev                 # wrangler dev on :8787
@@ -95,11 +95,15 @@ architectural change is needed. See the bundle limit below.
 The plumbing, unchanged from the original plan and now confirmed necessary by
 measurement rather than assumed:
 
-- Data keyed by `(translation, book)`. **32 of 66 shared books differ in
-  versification**, so `VERSE_COUNTS`, `BOOK_START`, `CHAPTER_OFFSET`,
+- ~~A `?translation=` parameter defaulting to `asv`~~ **done.**
+  `src/translations.ts` is the registry; `/books`, `/passages` and `/search`
+  accept `?translation=`, and an unknown id is a 404 naming what is served
+  rather than a silent fall back. Every ASV response was checked byte-identical.
+- **Next:** data keyed by `(translation, book)`. **32 of 66 shared books differ
+  in versification**, so `VERSE_COUNTS`, `BOOK_START`, `CHAPTER_OFFSET`,
   `sequenceOf` and `locate` all become per-translation. There is no shared
-  skeleton to share.
-- A `?translation=` parameter defaulting to `asv`, so nothing existing breaks.
+  skeleton. The registry deliberately holds no verse counts yet — carrying them
+  for one translation and not the other is worse than carrying them for neither.
 - `data_availability` per `(translation, book)` — the DRA supplies exactly the
   seven books the ASV reports as `metadata_only`.
 - Ingest must tolerate a source with **no `<d>` titles and no footnotes**. The
