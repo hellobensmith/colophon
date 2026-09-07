@@ -38,15 +38,20 @@ The whole Bible — 31,102 verses — is compiled into the Worker itself. A requ
 never touches a database, a cache, or the network. Verse lookup is a string
 slice; search runs BM25 over an inverted index built at compile time.
 
-Everything fits Cloudflare's free plan, measured on the deployed Worker rather
-than a laptop:
+Measured on the deployed Worker rather than a laptop, and re-measured by
+`bun run check:platform` so these numbers cannot quietly go stale:
 
-| | Measured | Free-plan limit |
+| | Measured | Limit |
 | --- | --- | --- |
-| Bundle | 1.93 MB gzip | 3 MB |
-| CPU per request | 4 ms median, 8 ms peak | 10 ms |
-| Worker startup | ~53 ms | 1,000 ms |
-| Requests | — | 100,000/day |
+| Bundle | 1.94 MB gzip | 10 MB on this account's plan; 3 MB on the free plan |
+| CPU per request | 6–18 ms median, 39 ms peak | none enforced on this plan; 10 ms on the free plan |
+| Worker startup | ~19 ms | 1,000 ms |
+| Requests | — | 100,000/day on the free plan |
+
+The CPU figures move between runs because requests land across many isolates and
+each new one pays a posting-cache warm; a long phrase search is the expensive
+shape. A deployment of this on the free plan would exceed the 10 ms CPU limit on
+those searches, and the bundle would still fit.
 
 The peak is the first search an isolate serves, which pays to decode the
 postings it touches. Everything after that runs in 0–4 ms.
@@ -62,8 +67,8 @@ the year of `immutable` it used to claim, so a correction propagates on its own.
 Every response carries `x-generation-id`, so a caller can always tell which
 build its copy came from.
 
-A cache hit still counts against the free plan's 100,000 requests/day, so
-requests, not CPU, are the limit you would reach first.
+A cache hit still counts against the free plan's 100,000 requests/day, so on
+that plan requests, not CPU, are the limit you would reach first.
 
 This is a deliberate trade. The text was fixed in 1901 and will never change, so
 there are no writes, no concurrency, and nothing to grow into. A database would
@@ -349,17 +354,25 @@ provision, and nothing to configure — the data is in the bundle.
 
 ## Limitations
 
-**One translation — but not because of the size limit.** A second would fit. The
-inverted index is 0.65 MB of the 1.86 MB bundle, and rebuilding it at startup
-from the text instead of shipping it costs a measured 180 ms against a 1,000 ms
-startup budget. That drops the payload to ~1.20 MB per translation, so two would
-land near 2.39 MB, inside the 3 MB free-tier limit.
+**One translation — but not because of the size limit.** A second fits with room
+to spare. Measured 7 September 2026: the Douay-Rheims adds 1.39 MB of text and
+offsets plus roughly 0.73 MB of index, putting two translations near 4.01 MB
+against this plan's 10 MB. No startup rebuild is needed, and none should be
+attempted — the DRA's index took 282 ms to build locally, which is past the
+1,000 ms startup budget once production's roughly fourfold slowdown is applied.
 
-That trade is not made here, because it would add 180 ms to every cold isolate
-for no present benefit. It is a known, measured option for whenever a second
-translation is actually wanted, rather than a wall.
+So the single translation here is a matter of the work not being done yet, not
+a wall. What a second one actually needs is plumbing: verse counts are per
+edition, and 32 of the 66 books the ASV and the Douay-Rheims share disagree
+about them — Esther and Daniel by whole chapters — so a verse coordinate is
+only meaningful paired with the translation it was resolved against.
 
-**Updating means redeploying.** Fine for a text fixed in 1901.
+**Updating means redeploying, and then waiting.** Fine for a text fixed in 1901,
+but worth stating plainly: a deploy does not purge the cache in front of the
+Worker, so a correction takes up to the `max-age` on the affected responses —
+a day for verse data — to reach a caller who has already fetched that URL. Every
+response carries `x-generation-id`, so a stale copy can always be identified as
+one.
 
 **Very common single words are capped.** Searching `the` on its own scans the
 first 6,000 postings and sets `truncated: true`. The cap is tuned against CPU

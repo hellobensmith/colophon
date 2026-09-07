@@ -123,7 +123,7 @@ Re-litigating these wastes time. Each was measured, not chosen by taste.
 
 | Decision | Reason |
 |---|---|
-| **No database** | The corpus is 31,102 rows fixed in 1901: no writes, no concurrency, no growth. Embedding measured 1.93 MB gzip / 4 ms CPU with zero I/O. A DB adds a round trip to one region to solve a problem we do not have. |
+| **No database** | The corpus is 31,102 rows fixed in 1901: no writes, no concurrency, no growth. Embedding measured 1.94 MB gzip with zero I/O, and 6-18 ms median CPU (re-measured 7 September; the 4 ms recorded originally was a quieter sample). A DB adds a round trip to one region to solve a problem we do not have. |
 | **Embedded, not R2** | Same measurement, and it survives the second translation: the limit is 10 MB, not the 3 MB assumed here, so two translations fit at ~4.01 MB with room for about four more. R2 is not needed for Phase 1. |
 | **Search stays in v1** | A build brief we evaluated forbids it. We measured the alternative and kept it; the morphology work is the most-used feature. |
 | **Greek/Hebrew psalm numbering synthesized** | That brief forbids synthesizing versification the source does not carry. We built it anyway, verified it as a bijection over 2,577 positions, and then confirmed it externally against Douay-Rheims. |

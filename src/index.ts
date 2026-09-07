@@ -149,10 +149,14 @@ app.use("*", async (context, next) => {
  * Caching is handled by the platform, not here. `[cache] enabled` in
  * wrangler.toml puts a cache in front of the Worker, so a hit is served without
  * running it at all — no CPU, where an in-Worker Cache API lookup still had to
- * boot the isolate and execute. Deploying invalidates it automatically, which is
- * what makes the `immutable` Cache-Control on verse data safe: new data cannot
- * be masked by a stale entry. Responses set their own Cache-Control below, and
- * that is what decides what gets stored.
+ * boot the isolate and execute. Measured at 1 MISS and 7 HITs across 8
+ * identical requests.
+ *
+ * Deploying does *not* invalidate it. This comment used to say the opposite,
+ * and called that what made an `immutable` Cache-Control safe on verse data.
+ * Since it is false, verse responses are capped at a day instead — see the
+ * comment on VERSE_DATA. Responses set their own Cache-Control below, and that
+ * is what decides what gets stored.
  */
 
 /* ------------------------------------------------------------------ *

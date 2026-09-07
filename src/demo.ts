@@ -303,8 +303,8 @@ export const DEMO_HTML = `<!doctype html>
     <dl class="facts">
       <div><dt>Verses</dt><dd>31,102</dd></div>
       <div><dt>Canons</dt><dd>66 &middot; 73 &middot; 76</dd></div>
-      <div><dt>Bundle</dt><dd>1.93 MB</dd></div>
-      <div><dt>CPU / request</dt><dd>4 ms</dd></div>
+      <div><dt>Bundle</dt><dd>1.94 MB</dd></div>
+      <div><dt>CPU / request</dt><dd>6&ndash;18 ms</dd></div>
     </dl>
   </div>
 </header>
