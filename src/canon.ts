@@ -212,6 +212,56 @@ export const CANON_ORDER: Readonly<Record<Tradition, readonly string[]>> = {
   orthodox_greek: [...ORTHODOX_OLD_TESTAMENT, ...NEW_TESTAMENT_ORDER],
 };
 
+/**
+ * How a particular printed edition orders its books.
+ *
+ * This is deliberately *not* {@link CANON_ORDER}, and the two must not be
+ * collapsed. They answer different questions:
+ *
+ * - A **tradition** order answers "what is the Catholic canon, and in what
+ *   sequence is it enumerated". `catholic` above follows the USCCB's NABRE
+ *   interleaving, where Tobit and Judith sit after Nehemiah and Wisdom and
+ *   Sirach after the Song.
+ * - An **edition** order answers "how does this book of this edition actually
+ *   print". eBible's Douay-Rheims gathers the whole deuterocanon *after
+ *   Malachi*, immediately before Matthew.
+ *
+ * Both are real Catholic orderings. Reporting only the tradition order would
+ * silently reorder what the source prints; reporting only the edition order
+ * would make "the Catholic canon" change shape depending on which translation
+ * was asked. So each is carried on its own terms, which is the same commitment
+ * the identity headers make about the text itself.
+ */
+export type EditionId = "asv" | "dra";
+
+const PROTESTANT_OLD_TESTAMENT: readonly string[] = PROTESTANT_ROWS.filter(
+  (row) => row[2] === "OT",
+).map((row) => row[0]);
+
+/**
+ * Verified 7 September 2026 against `engDRA_usfx.xml` (sha256 9dfbc526…): the
+ * parsed document order is the 39 Protestant Old Testament books, then these
+ * seven, then the New Testament.
+ */
+const DRA_DEUTEROCANON: readonly string[] = ["TOB", "JDT", "WIS", "SIR", "BAR", "1MA", "2MA"];
+
+export const EDITION_ORDER: Readonly<Record<EditionId, readonly string[]>> = {
+  asv: PROTESTANT_ORDER,
+  dra: [...PROTESTANT_OLD_TESTAMENT, ...DRA_DEUTEROCANON, ...NEW_TESTAMENT_ORDER],
+};
+
+export const EDITIONS: readonly EditionId[] = ["asv", "dra"];
+
+export function isEdition(value: string): value is EditionId {
+  return (EDITIONS as readonly string[]).includes(value);
+}
+
+/** 1-based position of a book as this edition prints it, or null if absent. */
+export function editionPosition(bookId: string, edition: EditionId): number | null {
+  const index = EDITION_ORDER[edition].indexOf(bookId);
+  return index === -1 ? null : index + 1;
+}
+
 export const TRADITIONS: readonly Tradition[] = [
   "protestant",
   "catholic",
