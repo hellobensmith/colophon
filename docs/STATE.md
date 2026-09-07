@@ -1,6 +1,6 @@
 # State — read this first
 
-Last updated 7 September 2026 · public repo · working tree clean
+Last updated 7 September 2026 · public repo · working tree clean · deployed
 
 This file exists so a new session does not have to re-derive anything. Everything
 below was measured or verified; nothing here is recalled.
@@ -269,12 +269,67 @@ which text it is holding. Repo, Worker, package and docs all renamed; the old
 
 ## Open questions
 
-1. **Send the Bible.org outreach?** Drafted and unsent at
-   `conformance/outreach/bible-org.md`. It leads with their translator notes and
-   offers the API findings underneath, freely.
-2. **Publish the matrix** — after the outreach, with a two-week window.
+1. ~~Send the Bible.org outreach?~~ **Decided 7 September 2026: no.** The draft
+   stays at `conformance/outreach/bible-org.md` as a record of the approach; it
+   is not being sent. Do not re-open this without Ben saying so.
+2. **Publish the matrix** — this was gated behind the outreach, which is no
+   longer happening, so the gate is gone and the question is open on its own
+   terms. The framing in `conformance/report.md` is already transparency rather
+   than scorecard.
 3. **Should the conformance suite become the front door** — a service any API
    runs against itself — rather than a file in this repository?
+4. **Verse-data caching is capped at a day.** Raising it needs either a real
+   purge, which workers.dev has no zone for, or the generation id in the URL.
+   Deliberate, and Ben can overrule it — see the trap below.
+
+---
+
+## Where the 7 September session left off
+
+Seven commits, all deployed and pushed. `bun test` 186 across 12 files,
+`bun run typecheck` clean, `bun run check:contract` 54/54, `bun run
+check:platform` all green.
+
+**Shipped**
+
+- **Request hardening.** Deduplicated and capped query terms at 12; `God`
+  repeated 5,000 times had measured 1.1 s of CPU from a hand-typable URL. Also
+  a 512-character input cap, 64 comma-separated reference segments, and
+  `locate()` turned from a 66-book scan into a binary search.
+- **A rejected guard, kept as reasoning.** Pricing queries from document
+  frequencies and refusing expensive ones cannot work: the costliest query the
+  index can express prices at 135,841 and "and it came to pass in the days of
+  the king" at 99,444. It was also refusing `?q=the`. See the comment on
+  `MAX_QUERY_TERMS`.
+- **`EDITION_ORDER` beside `CANON_ORDER`.** What an edition prints is not what a
+  tradition counts. `src/edition.test.ts` asserts the two *disagree* about
+  Tobit, so a future collapse fails loudly.
+- **`bun run check:platform`.** The platform claims in this file now run.
+- **Exact search totals.** The scan cap was undercounting multi-term results —
+  345 reported as 313 — and raising it to 25,000 is also 4.5x faster there.
+- **`src/translations.ts`.** `?translation=` on `/books`, `/passages`,
+  `/search`, defaulting to `asv`; unknown ids are a 404 naming what is served.
+  Every ASV response verified byte-identical.
+
+**Pick up here: move versification into the registry.**
+
+`src/translations.ts` deliberately holds no verse counts. The ASV's tables are
+still in `src/data/meta.ts`, reached through `src/parser.ts`. Everything that
+has to become per-translation, from `lcr find`:
+
+`VERSE_COUNTS` — `src/parser.ts` (5 sites), `src/psalms.ts`, `src/data.test.ts`,
+`scripts/build-data.ts`; plus `BOOK_START`, `CHAPTER_OFFSET`, `BOOK_STARTS`,
+`sequenceOf`, `locate`, and `src/validate.ts`'s per-book assertions.
+
+Then `build:data` and `validate.ts` need to run per translation — both currently
+hard-code the ASV source URL — and the DRA data can be generated. Its archive is
+already verified: 2,946,666 bytes, sha256 `9dfbc526d699e9e461d0a8419c60dd12390e8618af7ac3e97083ae5e53e2ed29`,
+and ingest tolerating a source with **no `<d>` titles and no footnotes** is the
+one parser change the DRA actually needs.
+
+**Use `lcr find` for code search.** It answers in ~0.1 s. `lcr ask` and
+`lcr inspect` time out on this hardware — a 3B model on a 2017 x86 iMac — so
+treat them as unavailable until Ben says the model situation has changed.
 
 ---
 
