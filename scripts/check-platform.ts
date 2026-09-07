@@ -36,8 +36,25 @@ const CLAIMS = {
   bundleLimitMb: 10,
   /** Free-tier limit, recorded only so a plan downgrade is caught. */
   freeTierLimitMb: 3,
-  /** Worst per-request CPU seen in production, in ms. */
-  worstCpuMs: 40,
+  /**
+   * CPU is claimed as two numbers because it is two things.
+   *
+   * The median tracks the code: it moves when a query gets more expensive, and
+   * is what a regression shows up in. The worst tracks cold isolates, which is
+   * noise from this script's point of view — a request landing on a fresh
+   * isolate pays the posting-cache warm, and a run straight after a deploy
+   * finds nothing but fresh isolates.
+   *
+   * Observed across six runs on 7 September 2026: median 3-18 ms, worst
+   * 21-48 ms, the 48 immediately after a deploy. One number for both meant the
+   * check failed on cold starts while a genuine slowdown could hide inside the
+   * same range.
+   *
+   * These bounds are set from that spread with headroom. If one fails,
+   * re-measure and find out which of the two moved — do not widen it to pass.
+   */
+  medianCpuMs: 25,
+  worstCpuMs: 60,
   /** Whether the platform enforces a CPU cap by terminating requests. */
   cpuCapEnforced: false,
   /**
@@ -273,9 +290,14 @@ if (!attached) {
     const median = cpuTimes[Math.floor(cpuTimes.length / 2)]!;
     const worst = cpuTimes[cpuTimes.length - 1]!;
     report(
+      median <= CLAIMS.medianCpuMs,
+      "production cpu, median",
+      `n=${cpuTimes.length} median=${median}ms (claim: <=${CLAIMS.medianCpuMs}ms) — tracks the code`,
+    );
+    report(
       worst <= CLAIMS.worstCpuMs,
-      "production cpu",
-      `n=${cpuTimes.length} median=${median}ms worst=${worst}ms (claim: <=${CLAIMS.worstCpuMs}ms)`,
+      "production cpu, worst",
+      `worst=${worst}ms (claim: <=${CLAIMS.worstCpuMs}ms) — cold isolates, high right after a deploy`,
     );
 
     // Whether a cap is enforced is a different question from how much CPU is
