@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "check:contract": "bun scripts/check-contract.ts",
+    "check:platform": "bun scripts/check-platform.ts",
     "conformance": "bun conformance/run.ts"
   },
   "dependencies": {

@@ -32,6 +32,8 @@ bun run typecheck           # tsc, strict
 bun run build:data          # re-ingest; refuses to emit on any failed assertion
 bun run dev                 # wrangler dev on :8787
 bun run check:contract      # live responses against openapi.yaml (server must be up)
+bun run check:platform      # re-measures the platform claims below against production
+bun run check:platform --probe-limit   # also verifies the real bundle limit
 bun conformance/run.ts --cached   # replay the matrix offline
 bun run deploy
 ```
@@ -121,7 +123,7 @@ Re-litigating these wastes time. Each was measured, not chosen by taste.
 | **Embedded, not R2** | Same measurement, and it survives the second translation: the limit is 10 MB, not the 3 MB assumed here, so two translations fit at ~4.01 MB with room for about four more. R2 is not needed for Phase 1. |
 | **Search stays in v1** | A build brief we evaluated forbids it. We measured the alternative and kept it; the morphology work is the most-used feature. |
 | **Greek/Hebrew psalm numbering synthesized** | That brief forbids synthesizing versification the source does not carry. We built it anyway, verified it as a bijection over 2,577 positions, and then confirmed it externally against Douay-Rheims. |
-| **Platform cache, not the Cache API** | Measured again 7 September: 8 identical requests gave 1 MISS and 7 HITs, invoking the Worker once. The mechanism recorded here was wrong, though — `[cache] enabled` is not a wrangler field and was silently ignored; the caching comes from the Worker's own `Cache-Control: immutable` and Cloudflare's default edge caching. The dead key has been removed. A deploy invalidates it automatically, which is what makes `immutable` safe. The in-Worker Hono middleware was removed as redundant. |
+| **Platform cache, not the Cache API** | `[cache] enabled` in `wrangler.toml` serves hits *without running the Worker*: re-measured 7 September at 1 MISS and 7 HITs across 8 identical requests, one invocation. **Wrangler warns `Unexpected fields found in top-level field: "cache"` and honours the key anyway.** That warning is not evidence the key is dead — acting on it the same day switched caching off and took 8 identical requests to 8 invocations. `bun run check:platform` now counts invocations, so this fails loudly instead of silently. A deploy invalidates it automatically, which is what makes `immutable` safe. The in-Worker Hono middleware was removed as redundant. |
 | **Exact-form search ranking rejected** | Built and measured. It fixed the four homographs but pushed `spake`, `saith` and `went` out of the top 20 entirely, and roughly doubled CPU. `spake` outnumbers `speak` in this translation, so the trade loses. |
 | **Query cost cap rejected** | Built to refuse expensive searches, priced from the shipped document frequencies, and removed the same day. The costliest query the index can express prices at 135,841; "and it came to pass in the days of the king" prices at 99,444. No threshold separates them, and it was refusing `?q=the`, which the spec documents. What it guarded against is a one-time posting-cache warm per isolate, not a repeatable amplification. Deduplicating terms and capping at twelve is the whole fix. |
 | **Tradition order and edition order are different facts** | `/books?tradition=catholic` keeps the USCCB's NABRE interleaving, because that answers "what is the Catholic canon". The DRA's own after-Malachi order is carried as edition metadata, because that answers "how does this edition print". Collapsing them into one field forces a wrong answer to one of the two questions. |
@@ -218,6 +220,15 @@ the six external APIs do no reference parsing at all. Full matrix in
 
 ## Traps that already cost time
 
+- **Wrangler warns about `[cache]` and honours it.** `Unexpected fields found in
+  top-level field: "cache"` is emitted on every deploy, and the key works. It was
+  removed on that evidence and edge caching stopped — 8 identical requests went
+  from 1 Worker invocation to 8, and `cf-cache-status` vanished. Restored and
+  verified. `bun run check:platform` guards it now.
+- **Bun's `fetch` is not served from Cloudflare's edge cache.** The same URL that
+  curl reports as MISS,HIT,HIT… invokes the Worker every time from Bun, with no
+  `cf-cache-status` header at all. Any cache measurement written in Bun must
+  shell out to curl, or it will report caching as broken while it works.
 - **ebible.org truncates large downloads.** `scripts/download.ts` resumes with
   Range requests and keeps partial bytes; reading the whole body at once loses
   them and the retry can never progress.

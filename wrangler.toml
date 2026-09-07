@@ -5,12 +5,17 @@ compatibility_date = "2026-09-02"
 # The ASV corpus is embedded in the bundle, so the Worker needs no bindings,
 # secrets, or network access at runtime.
 
-# There is deliberately no [cache] block here. One was present and did nothing:
-# wrangler rejects it as an unexpected top-level field. Caching in front of the
-# Worker is real — 8 identical requests measured 1 MISS and 7 HITs, invoking the
-# Worker once — but it comes from the explicit Cache-Control header the Worker
-# sets, plus Cloudflare's default edge caching. Re-adding the key would only
-# restore the wrong explanation.
+# Cache responses in front of the Worker. On a hit the Worker does not run at
+# all, so repeat traffic costs no CPU.
+#
+# Do not remove this because wrangler warns "Unexpected fields found in
+# top-level field: cache". It warns, and then honours it. Removing it on the
+# strength of that warning switched edge caching off on 7 September 2026:
+# 8 identical requests went from 1 Worker invocation to 8, and cf-cache-status
+# disappeared from the response entirely. `bun run check:platform` now measures
+# this by counting invocations, so the same mistake fails loudly.
+[cache]
+enabled = true
 
 [observability]
 enabled = true
