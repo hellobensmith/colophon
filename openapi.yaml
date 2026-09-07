@@ -72,6 +72,22 @@ paths:
     get:
       summary: List books in a canon's order
       parameters:
+        - name: translation
+          in: query
+          required: false
+          description: |
+            Which translation to read. Defaults to `asv`.
+
+            An unknown id is a 404 naming what this deployment does serve, never
+            a silent fall back to the default: a caller asking for a text this
+            deployment does not hold must be told, not handed a different Bible.
+
+            Verse coordinates belong to a translation, not to the canon. Editions
+            disagree about versification — of the 66 books the ASV and the
+            Douay-Rheims share, 32 differ, Esther and Daniel by whole chapters —
+            so a reference is only meaningful paired with the translation it was
+            resolved against.
+          schema: { type: string, default: asv, example: asv }
         - name: tradition
           in: query
           required: false
@@ -172,6 +188,22 @@ paths:
         book, or a chapter or verse past the end — is a 404, matching what the
         `/books` endpoints return for the same condition.
       parameters:
+        - name: translation
+          in: query
+          required: false
+          description: |
+            Which translation to read. Defaults to `asv`.
+
+            An unknown id is a 404 naming what this deployment does serve, never
+            a silent fall back to the default: a caller asking for a text this
+            deployment does not hold must be told, not handed a different Bible.
+
+            Verse coordinates belong to a translation, not to the canon. Editions
+            disagree about versification — of the 66 books the ASV and the
+            Douay-Rheims share, 32 differ, Esther and Daniel by whole chapters —
+            so a reference is only meaningful paired with the translation it was
+            resolved against.
+          schema: { type: string, default: asv, example: asv }
         - name: ref
           in: query
           required: true
@@ -257,6 +289,22 @@ paths:
         Ranking: every result contains every term, so BM25's length
         normalization orders them, putting the most concise matching verse first.
       parameters:
+        - name: translation
+          in: query
+          required: false
+          description: |
+            Which translation to read. Defaults to `asv`.
+
+            An unknown id is a 404 naming what this deployment does serve, never
+            a silent fall back to the default: a caller asking for a text this
+            deployment does not hold must be told, not handed a different Bible.
+
+            Verse coordinates belong to a translation, not to the canon. Editions
+            disagree about versification — of the 66 books the ASV and the
+            Douay-Rheims share, 32 differ, Esther and Daniel by whole chapters —
+            so a reference is only meaningful paired with the translation it was
+            resolved against.
+          schema: { type: string, default: asv, example: asv }
         - name: q
           in: query
           required: true

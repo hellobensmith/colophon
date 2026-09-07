@@ -33,6 +33,7 @@ import {
 } from "./corpus.ts";
 import { search, countQueryTerms, MAX_QUERY_TERMS } from "./search.ts";
 import { DEMO_HTML } from "./demo.ts";
+import { resolveTranslation, UnknownTranslationError } from "./translations.ts";
 import { TITLED_PSALMS, REVISION_ID, GENERATION_ID, EDITION_ID } from "./data/meta.ts";
 
 /** Longest passage served in one response. */
@@ -75,20 +76,24 @@ const VERSE_DATA = "public, max-age=86400";
 const DAILY = "public, max-age=86400";
 const BRIEF = "public, max-age=60";
 
-/** Where the text came from, so provenance travels with the data. */
-const SOURCE = {
-  name: "eBible.org",
-  url: "https://ebible.org/Scriptures/eng-asv_usfx.zip",
-  format: "USFX",
-} as const;
-
-const TRANSLATION = {
-  id: "asv",
-  name: "American Standard Version",
-  language: "en",
-  license: "Public Domain",
-  year: 1901,
-} as const;
+/**
+ * The translation this request is about.
+ *
+ * Every endpoint that returns text or metadata resolves this from
+ * `?translation=`, defaulting to the ASV so existing callers are unaffected.
+ * An unknown id is a 404, not a silent fallback: a caller asking for a text
+ * this deployment does not hold must be told, not handed a different Bible.
+ */
+function translationOf(context: { req: { query: (name: string) => string | undefined } }) {
+  try {
+    return resolveTranslation(context.req.query("translation"));
+  } catch (error) {
+    if (error instanceof UnknownTranslationError) {
+      throw new HttpError(404, "not_found", error.message);
+    }
+    throw error;
+  }
+}
 
 const TITLED_PSALM_SET: ReadonlySet<number> = new Set(TITLED_PSALMS);
 
@@ -203,6 +208,7 @@ app.get("/", (context) => {
 });
 
 app.get("/health", (context) => {
+  const translation = translationOf(context);
   context.header("Cache-Control", "no-store");
   return context.json({
     status: "ok",
@@ -213,13 +219,14 @@ app.get("/health", (context) => {
     verse_count: TOTAL_VERSES,
     // Stated here, not only in the README: a consumer should be able to learn
     // its obligations from the API rather than from prose it may never read.
-    translation: TRANSLATION,
-    source: SOURCE,
+    translation: translation.meta,
+    source: translation.source,
     timestamp: new Date().toISOString(),
   });
 });
 
 app.get("/books", (context) => {
+  const translation = translationOf(context);
   const requested = context.req.query("tradition") ?? "protestant";
   if (!isTradition(requested)) {
     throw new HttpError(
@@ -232,7 +239,7 @@ app.get("/books", (context) => {
   context.header("Cache-Control", DAILY);
   return context.json({
     tradition,
-    translation: TRANSLATION,
+    translation: translation.meta,
     books: CANON_ORDER[tradition].map((bookId) => serializeBook(bookId)),
   });
 });
@@ -289,6 +296,7 @@ app.get("/books/:id/chapters/:num", (context) => {
 });
 
 app.get("/passages", (context) => {
+  const translation = translationOf(context);
   const reference = context.req.query("ref");
   if (reference === undefined || reference.trim() === "") {
     throw new HttpError(400, "bad_request", 'The "ref" query parameter is required, for example ?ref=John 3:16');
@@ -348,13 +356,14 @@ app.get("/passages", (context) => {
   context.header("Cache-Control", VERSE_DATA);
   return context.json({
     reference: parsed.reference,
-    translation: TRANSLATION,
+    translation: translation.meta,
     numbering: parsed.numbering,
     verses,
   });
 });
 
 app.get("/search", (context) => {
+  const translation = translationOf(context);
   const query = context.req.query("q") ?? "";
   if (query.trim().length < MIN_QUERY_LENGTH) {
     throw new HttpError(
@@ -393,7 +402,7 @@ app.get("/search", (context) => {
     limit,
     offset,
     truncated: outcome.truncated,
-    translation: TRANSLATION,
+    translation: translation.meta,
     results: outcome.hits.map((hit) => ({
       id: hit.id,
       book: hit.book,

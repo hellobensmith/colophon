@@ -112,6 +112,10 @@ const SUCCESSES: readonly (readonly [string, string])[] = [
   ["/passages?ref=Psalm%209:21-22&numbering=greek", "/passages"],
   ["/passages?ref=Psalm%209:1&numbering=greek", "/passages"],
   ["/search?q=good%20shepherd", "/search"],
+  // The explicit default must behave exactly like omitting it.
+  ["/search?q=good%20shepherd&translation=asv", "/search"],
+  ["/passages?ref=John%203:16&translation=asv", "/passages"],
+  ["/books?translation=asv", "/books"],
   ["/search?q=the", "/search"],
   // Ordinary long phrases made of common words: served, never refused.
   ["/search?q=and+it+came+to+pass+in+the+days+of+the+king", "/search"],
@@ -151,6 +155,10 @@ const ERRORS: readonly (readonly [string, number])[] = [
   // Distinct terms must be alphabetic: the tokenizer strips digits, so
   // `word0 word1` is one term, not two.
   [`/search?q=${DISTINCT_TERMS.join("+")}`, 400],
+  // An unknown translation is a 404, never a silent fall back to the default.
+  ["/passages?ref=John%203:16&translation=kjv", 404],
+  ["/search?q=love&translation=kjv", 404],
+  ["/books?translation=nonsense", 404],
   ["/nope", 404],
 ];
 
