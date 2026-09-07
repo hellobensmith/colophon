@@ -23,7 +23,7 @@ transparency, not criticism.
 | Tests | 186 across 12 files |
 | Contract | 54/54 responses conform to `openapi.yaml` |
 | Bundle | 1,940 KiB gzip against a 10 MB limit (paid plan; the 3 MB figure is free-tier) |
-| Production CPU | 6 ms median overall; 16-21 ms median on long phrase searches, 33 ms peak. No CPU cap enforced. |
+| Production CPU | median 3-18 ms, worst 21-48 ms across six runs; the worst tracks cold isolates, not the code. No CPU cap enforced. |
 | Repo | `github.com/hellobensmith/colophon`, **public** |
 
 ```bash
@@ -181,6 +181,15 @@ That much was right. What was wrong was the ceiling it was measured against.
 **So Phase 1 needs no architectural change.** Keep the corpus embedded, keep the
 search index shipped rather than rebuilt at startup, and add the DRA. Roughly six
 MB of headroom remains — about four more translations at this size.
+
+**CPU is two numbers, not one.** `check:platform` claims a median and a worst
+separately, because they measure different things. The median tracks the code
+and is where a regression shows. The worst tracks cold isolates — a request
+landing on a fresh one pays the posting-cache warm, and a run straight after a
+deploy finds nothing else, which is how a 48 ms reading appeared with no code
+change behind it. Conflating them meant the check failed on cold starts while a
+real slowdown could have hidden in the same range. Claimed at 25 ms and 60 ms,
+from an observed 3-18 and 21-48.
 
 **Production CPU is higher than this file recorded.** Measured 7 September with
 `wrangler tail`, cache-busted so every request reached the Worker:
