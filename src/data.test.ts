@@ -147,6 +147,20 @@ describe("sequence integrity", () => {
     }
   });
 
+  test("locate agrees with sequenceOf at every book and chapter boundary", () => {
+    // locate() became a binary search to keep a 500-verse passage affordable;
+    // a scan and a search must not disagree at the edges.
+    for (const bookId of PROTESTANT_ORDER) {
+      const chapters = VERSE_COUNTS[bookId]!;
+      for (let chapter = 1; chapter <= chapters.length; chapter += 1) {
+        for (const verse of [1, chapters[chapter - 1]!]) {
+          const sequence = sequenceOf(bookId, chapter, verse);
+          expect(locate(sequence)).toEqual({ book: bookId, chapter, verse });
+        }
+      }
+    }
+  });
+
   test("round-trips a sample across the whole range", () => {
     for (let sequence = 1; sequence <= TOTAL_VERSES; sequence += 97) {
       const verse = verseAt(sequence);

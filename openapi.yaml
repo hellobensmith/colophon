@@ -175,7 +175,11 @@ paths:
         - name: ref
           in: query
           required: true
-          schema: { type: string, example: "John 3:16" }
+          description: |
+            At most 512 characters, and at most 64 comma-separated parts. Both
+            are far past any real citation; they exist so that a reference which
+            was never going to be served is refused before it is parsed.
+          schema: { type: string, maxLength: 512, example: "John 3:16" }
         - name: numbering
           in: query
           required: false
@@ -256,7 +260,14 @@ paths:
         - name: q
           in: query
           required: true
-          schema: { type: string, minLength: 2, example: good shepherd }
+          description: |
+            Between 2 and 512 characters, resolving to at most 12 distinct terms;
+            duplicates do not count against that, so a repeated word is one term.
+
+            Twelve is past any real phrase, and no query is refused for being
+            made of common words: `and it came to pass in the days of the king`
+            is served like any other.
+          schema: { type: string, minLength: 2, maxLength: 512, example: good shepherd }
         - name: limit
           in: query
           schema: { type: integer, minimum: 1, maximum: 100, default: 20 }

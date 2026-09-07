@@ -31,13 +31,22 @@ import {
   TOTAL_VERSES,
   type CorpusVerse,
 } from "./corpus.ts";
-import { search } from "./search.ts";
+import { search, countQueryTerms, MAX_QUERY_TERMS } from "./search.ts";
 import { DEMO_HTML } from "./demo.ts";
 import { TITLED_PSALMS, REVISION_ID, GENERATION_ID, EDITION_ID } from "./data/meta.ts";
 
 /** Longest passage served in one response. */
 const MAX_PASSAGE_VERSES = 500;
 const MAX_SEARCH_LIMIT = 100;
+
+/**
+ * Longest input accepted for a reference or a query.
+ *
+ * Defence in depth rather than a limit anyone will meet: the parser and the
+ * search path bound their own work, and this simply stops the pathological
+ * cases before either is entered. The longest real citation is well under this.
+ */
+const MAX_INPUT_LENGTH = 512;
 const DEFAULT_SEARCH_LIMIT = 20;
 const MIN_QUERY_LENGTH = 2;
 
@@ -263,6 +272,13 @@ app.get("/passages", (context) => {
   if (reference === undefined || reference.trim() === "") {
     throw new HttpError(400, "bad_request", 'The "ref" query parameter is required, for example ?ref=John 3:16');
   }
+  if (reference.length > MAX_INPUT_LENGTH) {
+    throw new HttpError(
+      400,
+      "bad_request",
+      `A reference may be at most ${MAX_INPUT_LENGTH} characters; this one is ${reference.length}.`,
+    );
+  }
 
   const numberingParam = context.req.query("numbering") ?? "english";
   if (
@@ -324,6 +340,23 @@ app.get("/search", (context) => {
       400,
       "bad_request",
       `Search queries must be at least ${MIN_QUERY_LENGTH} characters.`,
+    );
+  }
+  if (query.length > MAX_INPUT_LENGTH) {
+    throw new HttpError(
+      400,
+      "bad_request",
+      `A search query may be at most ${MAX_INPUT_LENGTH} characters; this one is ${query.length}.`,
+    );
+  }
+  // Cost scales with the number of distinct terms, so it is bounded and the
+  // caller is told rather than being silently truncated.
+  const termCount = countQueryTerms(query);
+  if (termCount > MAX_QUERY_TERMS) {
+    throw new HttpError(
+      400,
+      "bad_request",
+      `A search may use at most ${MAX_QUERY_TERMS} distinct words; this one has ${termCount}.`,
     );
   }
 

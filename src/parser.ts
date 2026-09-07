@@ -91,6 +91,9 @@ const CHAPTER_OFFSET = new Map<string, readonly number[]>();
   }
 }
 
+/** Ascending first-sequence of each book, for binary search in {@link locate}. */
+const BOOK_STARTS: readonly number[] = PROTESTANT_ORDER.map((id) => BOOK_START.get(id) ?? 0);
+
 export function chapterCount(bookId: string): number {
   return VERSE_COUNTS[bookId]?.length ?? 0;
 }
@@ -279,11 +282,28 @@ function splitReference(input: string): { bookPart: string; numericPart: string 
   return { bookPart: match[1] ?? "", numericPart: (match[2] ?? "").trim() };
 }
 
+/**
+ * Ceiling on comma-separated segments in one reference.
+ *
+ * A citation like `1 Cor 13:4-7,13` has two. Ten thousand parsed in 11 ms before
+ * the 500-verse cap rejected the result, which is work done on behalf of a
+ * request that was never going to be served.
+ */
+const MAX_SEGMENTS = 64;
+
 function parseSegments(numericPart: string, singleChapterBook: boolean): RawSegment[] {
   const segments: RawSegment[] = [];
   let carriedChapter: number | null = null;
 
-  for (const piece of numericPart.split(",")) {
+  const pieces = numericPart.split(",");
+  if (pieces.length > MAX_SEGMENTS) {
+    throw new ParseError(
+      `A reference may have at most ${MAX_SEGMENTS} comma-separated parts; this one has ${pieces.length}`,
+      "syntax",
+    );
+  }
+
+  for (const piece of pieces) {
     const text = piece.trim();
     if (text === "") throw new ParseError("Empty segment in reference");
 
@@ -614,21 +634,46 @@ export function locate(sequence: number): { book: string; chapter: number; verse
   if (!Number.isInteger(sequence) || sequence < 1) {
     throw new ParseError(`Verse sequence out of range: ${sequence}`, "out_of_range");
   }
-  for (const bookId of PROTESTANT_ORDER) {
-    const start = BOOK_START.get(bookId);
-    const offsets = CHAPTER_OFFSET.get(bookId);
-    const chapters = VERSE_COUNTS[bookId];
-    if (start === undefined || offsets === undefined || chapters === undefined) continue;
-    const bookLength = offsets[offsets.length - 1]! + chapters[chapters.length - 1]!;
-    if (sequence >= start && sequence < start + bookLength) {
-      const withinBook = sequence - start;
-      for (let index = offsets.length - 1; index >= 0; index -= 1) {
-        const offset = offsets[index]!;
-        if (withinBook >= offset) {
-          return { book: bookId, chapter: index + 1, verse: withinBook - offset + 1 };
-        }
-      }
+  // Binary search rather than a scan: a 500-verse passage calls this once per
+  // verse, and a linear pass over 66 books made that 33,000 iterations.
+  let low = 0;
+  let high = BOOK_STARTS.length - 1;
+  let found = -1;
+  while (low <= high) {
+    const mid = (low + high) >>> 1;
+    if (BOOK_STARTS[mid]! <= sequence) {
+      found = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
     }
   }
-  throw new ParseError(`Verse sequence out of range: ${sequence}`, "out_of_range");
+  if (found === -1) throw new ParseError(`Verse sequence out of range: ${sequence}`, "out_of_range");
+
+  const bookId = PROTESTANT_ORDER[found]!;
+  const offsets = CHAPTER_OFFSET.get(bookId)!;
+  const chapters = VERSE_COUNTS[bookId]!;
+  const bookLength = offsets[offsets.length - 1]! + chapters[chapters.length - 1]!;
+  const withinBook = sequence - BOOK_STARTS[found]!;
+  if (withinBook >= bookLength) {
+    throw new ParseError(`Verse sequence out of range: ${sequence}`, "out_of_range");
+  }
+  // Chapter offsets ascend too, so the same search applies within the book.
+  let clow = 0;
+  let chigh = offsets.length - 1;
+  let chapterIndex = 0;
+  while (clow <= chigh) {
+    const mid = (clow + chigh) >>> 1;
+    if (offsets[mid]! <= withinBook) {
+      chapterIndex = mid;
+      clow = mid + 1;
+    } else {
+      chigh = mid - 1;
+    }
+  }
+  return {
+    book: bookId,
+    chapter: chapterIndex + 1,
+    verse: withinBook - offsets[chapterIndex]! + 1,
+  };
 }

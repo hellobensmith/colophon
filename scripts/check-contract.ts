@@ -113,7 +113,15 @@ const SUCCESSES: readonly (readonly [string, string])[] = [
   ["/passages?ref=Psalm%209:1&numbering=greek", "/passages"],
   ["/search?q=good%20shepherd", "/search"],
   ["/search?q=the", "/search"],
+  // Ordinary long phrases made of common words: served, never refused.
+  ["/search?q=and+it+came+to+pass+in+the+days+of+the+king", "/search"],
 ];
+
+/** Forty distinct alphabetic terms, past the twelve-term cap. */
+const DISTINCT_TERMS = Array.from(
+  { length: 40 },
+  (_, i) => String.fromCharCode(97 + Math.floor(i / 26)) + String.fromCharCode(97 + (i % 26)),
+);
 
 /** Failures, checked for both status code and the shared Error shape. */
 const ERRORS: readonly (readonly [string, number])[] = [
@@ -136,6 +144,13 @@ const ERRORS: readonly (readonly [string, number])[] = [
   ["/passages?ref=Psalms", 413],
   ["/search?q=a", 400],
   ["/search?q=love&limit=999", 400],
+  // The hardening limits. Each was a measured amplification, not a theory.
+  [`/passages?ref=John%203:${"9".repeat(600)}`, 400],
+  [`/passages?ref=John%203:${Array.from({ length: 200 }, (_, i) => i + 1).join(",")}`, 400],
+  [`/search?q=${"a".repeat(600)}`, 400],
+  // Distinct terms must be alphabetic: the tokenizer strips digits, so
+  // `word0 word1` is one term, not two.
+  [`/search?q=${DISTINCT_TERMS.join("+")}`, 400],
   ["/nope", 404],
 ];
 

@@ -38,6 +38,29 @@ const MAX_POSTINGS_SCANNED = 6_000;
 /** Ceiling on how many index terms one prefix wildcard may expand to. */
 const MAX_PREFIX_EXPANSIONS = 64;
 
+/**
+ * Ceiling on query terms.
+ *
+ * Cost is roughly (terms x candidates), and the candidate set is already bounded
+ * by the scan cap — but the term count was not, which made a short request an
+ * expensive one. "God" repeated five thousand times measured 1.1 seconds of CPU
+ * against a 10 ms budget, from a URL small enough to send by hand. Deduplicating
+ * and then capping fixes it: with twelve terms the worst query the index can
+ * express measured 8.1 ms on a cold cache and 1.2 ms on a warm one.
+ *
+ * Twelve is far past any real query; the longest sensible phrase anyone searches
+ * is a handful of words.
+ *
+ * A second cap, pricing a query from the shipped document frequencies and
+ * refusing the expensive ones, was built and then removed. It could not tell the
+ * two apart. The costliest query the index can express prices at 135,841, and
+ * "and it came to pass in the days of the king" — an ordinary thing to search
+ * for — prices at 99,444. Any threshold between them refuses real queries, and
+ * the cost it was guarding against is a one-time cache warm per isolate, not an
+ * amplification a caller can repeat.
+ */
+export const MAX_QUERY_TERMS = 12;
+
 const LINES: readonly string[] = INDEX.split("\n");
 
 const TOKENS: readonly string[] = LINES.map((line) => {
@@ -189,6 +212,12 @@ export function tokenizeQuery(query: string): string[] {
   return tokenize(query);
 }
 
+/** Distinct terms a query resolves to, before any cap is applied. */
+export function countQueryTerms(query: string): number {
+  return new Set(tokenize(query)).size;
+}
+
+
 export interface SearchHit extends CorpusVerse {
   readonly score: number;
 }
@@ -267,7 +296,10 @@ function termMatches(term: Term, document: number): boolean {
 }
 
 export function search(query: string, limit: number, offset: number): SearchOutcome {
-  const tokens = tokenizeQuery(query);
+  // Deduplicated and capped. The endpoint rejects an over-long query with a 400
+  // so a caller is told rather than silently truncated, but the library bounds
+  // itself too — a direct caller must not be able to spend unbounded CPU either.
+  const tokens = [...new Set(tokenizeQuery(query))].slice(0, MAX_QUERY_TERMS);
   if (tokens.length === 0) return { total: 0, hits: [], truncated: false };
 
   const terms = resolveTerms(tokens);
