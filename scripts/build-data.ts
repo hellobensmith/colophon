@@ -33,6 +33,7 @@ import { EDITION_ORDER } from "../src/canon.ts";
 import { buildFamilies } from "../src/morphology.ts";
 import { tokenize } from "../src/tokenize.ts";
 import { downloadWithResume, expectedSize, DownloadError } from "./download.ts";
+import { readLocal, sourceOverride, type SourceDocument } from "./sources.ts";
 import {
   CANONICAL_METADATA_VERSION,
   NORMALIZATION_POLICY_VERSION,
@@ -67,6 +68,13 @@ const EDITION: BuildEdition = (() => {
 /** Report what the source contains without asserting or writing anything. */
 const REPORT_ONLY = process.argv.includes("--report");
 
+/**
+ * A path handed over by whoever holds the text, instead of a public archive.
+ * This is the case the project exists for: a publisher whose edition no
+ * aggregator may serve has nothing to point a URL at.
+ */
+const LOCAL_SOURCE = sourceOverride(process.argv);
+
 const SOURCE_URL = archiveUrl(EDITION);
 const CACHE_DIR = new URL("../.cache/", import.meta.url).pathname;
 const ZIP_PATH = `${CACHE_DIR}${EDITION.sourceId}_usfx.zip`;
@@ -86,6 +94,33 @@ async function download(): Promise<void> {
     },
   });
   await Bun.write(ZIP_PATH, bytes);
+}
+
+/**
+ * The document to ingest, from wherever this run's source is.
+ *
+ * Identity is derived from the bytes that were actually read, so a local build
+ * and a downloaded one produce different revision ids for the same text. That
+ * is correct: the revision names what was ingested, and a publisher's own file
+ * is not the same artifact as an eBible archive even when the words match.
+ */
+async function loadSource(): Promise<SourceDocument> {
+  if (LOCAL_SOURCE !== undefined) {
+    console.log(`Reading ${LOCAL_SOURCE}`);
+    const document = await readLocal(LOCAL_SOURCE);
+    console.log(`  ${document.bytes.byteLength.toLocaleString()} bytes from ${document.origin}`);
+    return document;
+  }
+
+  console.log("Downloading USFX…");
+  await download();
+  console.log("Extracting…");
+  const xml = await extract();
+  return {
+    xml,
+    origin: SOURCE_URL,
+    bytes: new Uint8Array(await Bun.file(ZIP_PATH).arrayBuffer()),
+  };
 }
 
 async function extract(): Promise<string> {
@@ -389,11 +424,8 @@ function report(doc: UsfxDocument): void {
 
 async function main(): Promise<void> {
   console.log(`Building ${EDITION.id} (${EDITION.sourceId})`);
-  console.log("Downloading USFX…");
-  await download();
-
-  console.log("Extracting…");
-  const xml = await extract();
+  const source = await loadSource();
+  const xml = source.xml;
 
   console.log("Parsing…");
   const started = performance.now();
@@ -436,11 +468,10 @@ async function main(): Promise<void> {
   // Hashing the emitted meta.ts would be circular, since that file carries the
   // generation id the hash is meant to produce.
   console.log("Deriving identity…");
-  const archiveBytes = new Uint8Array(await Bun.file(ZIP_PATH).arrayBuffer());
   const sourceArchive = {
-    url: SOURCE_URL,
-    sha256: await sha256(archiveBytes),
-    byteLength: archiveBytes.byteLength,
+    url: source.origin,
+    sha256: await sha256(source.bytes),
+    byteLength: source.bytes.byteLength,
   };
   const revisionId = deriveRevisionId(sourceArchive);
 
