@@ -182,6 +182,19 @@ const ALIASES: ReadonlyMap<string, string> = new Map([
   ["3 john", "3JN"], ["3 jn", "3JN"], ["3 jhn", "3JN"],
   ["jude", "JUD"], ["jud", "JUD"],
   ["rev", "REV"], ["rv", "REV"], ["apocalypse", "REV"],
+
+  // The deuterocanon had no abbreviations at all: every one of these books
+  // resolved only by prefix-matching its full name, which happens to work for
+  // most of them and never worked for Judith, whose id is not a prefix of it.
+  // They became reachable when the Douay-Rheims was registered, so the names a
+  // reader of *that* edition would actually type belong here.
+  ["tob", "TOB"], ["tb", "TOB"],
+  ["jdt", "JDT"], ["jdth", "JDT"], ["jth", "JDT"],
+  ["wis", "WIS"], ["ws", "WIS"],
+  ["sir", "SIR"], ["ecclesiasticus", "SIR"], ["ecclus", "SIR"],
+  ["bar", "BAR"], ["br", "BAR"],
+  ["1 maccabees", "1MA"], ["1 macc", "1MA"], ["1 mac", "1MA"], ["1 ma", "1MA"],
+  ["2 maccabees", "2MA"], ["2 macc", "2MA"], ["2 mac", "2MA"], ["2 ma", "2MA"],
 ]);
 
 const ORDINAL_WORDS: ReadonlyMap<string, string> = new Map([
@@ -228,6 +241,25 @@ function resolveBook(raw: string, translation: string = DEFAULT_TRANSLATION): st
   if (candidates.size === 1) {
     const [only] = candidates;
     return ensureAvailable(only as string, raw, translation);
+  }
+
+  /*
+   * Whether an abbreviation is ambiguous depends on the edition. "Eccl" names
+   * only Ecclesiastes in the ASV, and could mean Ecclesiastes or Ecclesiasticus
+   * in the Douay-Rheims, which prints both. So narrow by what this edition
+   * actually contains before calling it ambiguous.
+   *
+   * Narrowing only ever breaks ties. A name matching exactly one book stays on
+   * the path above whether or not the edition has it, which is what keeps
+   * "Tobit" in the ASV reporting that it is not present rather than that it
+   * does not exist.
+   */
+  if (candidates.size > 1) {
+    const counts = versificationOf(translation).verseCounts;
+    const present = [...candidates].filter((id) => counts[id] !== undefined);
+    if (present.length === 1) {
+      return ensureAvailable(present[0]!, raw, translation);
+    }
   }
   if (candidates.size === 0) {
     throw new ParseError(`Unknown book: "${raw.trim()}"`, "unknown_book");

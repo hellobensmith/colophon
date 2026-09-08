@@ -146,3 +146,64 @@ describe("what is not per-translation yet says so", () => {
     expect(asv.body.total).toBeGreaterThan(0);
   });
 });
+
+describe("the deuterocanon is reachable by the names its readers use", () => {
+  // These books had no abbreviations at all. Every one resolved only by
+  // prefix-matching its full name, which happens to work for most and never
+  // worked for Judith, whose id is not a prefix of it. They only became
+  // reachable when the Douay-Rheims was registered.
+  test("Judith, which no abbreviation reached before", async () => {
+    for (const name of ["Judith", "Jdt", "Jdth", "Jth", "JDT"]) {
+      const response = await passage(`${name} 1:1`, "dra");
+      expect(response.status).toBe(200);
+      expect(response.body.verses[0].id).toBe("JDT.1.1");
+    }
+  });
+
+  test("Ecclesiasticus, which is what this edition calls Sirach", async () => {
+    for (const name of ["Sirach", "Ecclesiasticus", "Ecclus"]) {
+      const response = await passage(`${name} 3:1`, "dra");
+      expect(response.status).toBe(200);
+      expect(response.body.verses[0].id).toBe("SIR.3.1");
+    }
+  });
+
+  test("every book id the DRA prints also works as a reference", async () => {
+    const counts = (await import("./data/dra/meta.ts")).VERSE_COUNTS;
+    for (const id of Object.keys(counts)) {
+      const response = await passage(`${id} 1:1`, "dra");
+      expect(response.status).toBe(200);
+      expect(response.body.verses[0].book).toBe(id);
+    }
+  });
+});
+
+describe("ambiguity is a fact about the edition, not the abbreviation", () => {
+  /**
+   * "Eccles" names only Ecclesiastes in the ASV, and could mean Ecclesiastes or
+   * Ecclesiasticus in an edition printing both. Resolution narrows candidates
+   * by what the edition contains before calling anything ambiguous — without
+   * that, adding the Ecclesiasticus alias would have broken "Eccles" for every
+   * existing ASV caller.
+   */
+  test("the same prefix resolves in one edition and is refused in the other", async () => {
+    const asv = await passage("Eccles 1:1", "asv");
+    expect(asv.status).toBe(200);
+    expect(asv.body.verses[0].id).toBe("ECC.1.1");
+
+    const dra = await passage("Eccles 1:1", "dra");
+    expect(dra.status).toBe(400);
+    expect(dra.body.detail).toContain("Ambiguous");
+    expect(dra.body.detail).toContain("Ecclesiastes");
+    expect(dra.body.detail).toContain("Sirach");
+  });
+
+  test("narrowing only breaks ties, so a missing book still says it is missing", async () => {
+    // One candidate, absent from this edition: the message has to explain that
+    // the book is not in the ASV, not that no such book exists.
+    const response = await passage("Tobit 1:1", "asv");
+    expect(response.status).toBe(404);
+    expect(response.body.detail).toContain("not present in");
+    expect(response.body.detail).not.toContain("Unknown book");
+  });
+});
