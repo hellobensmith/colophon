@@ -105,7 +105,13 @@ unaccounted for.
 
 **32 of the 66 shared books differ in versification**, and not only the odd ones.
 EST is 10 chapters in the ASV and 16 in the DRA; DAN is 12 and 14. But Genesis,
-Matthew, Acts and 29 others differ chapter by chapter too. There is no shared
+Matthew, Acts and 29 others differ chapter by chapter too. Now measured from
+both generated corpora rather than asserted: 24 differ in book-level totals,
+and **8 more agree on every total while distributing verses differently** —
+NUM, JOS, JDG, JOB, ECC, ISA, JON, HAG. Those eight are the case that makes
+per-translation versification load-bearing rather than tidy: any check at book
+level calls them identical, and a coordinate resolved against the wrong
+edition returns the wrong verse under a reference that looks fine. There is no shared
 verse skeleton to key against, which settles the plumbing question: `VERSE_COUNTS`,
 `BOOK_START`, `CHAPTER_OFFSET`, `sequenceOf` and `locate` must all become
 per-translation. A verse coordinate is only meaningful with its translation.
@@ -147,9 +153,25 @@ measurement rather than assumed:
   editions' modules — and needs two editions present to design against, which is
   why it waits on the DRA ingest rather than leading it.
 - `data_availability` per `(translation, book)`. The ASV reports **ten** books as
-  `metadata_only`: TOB, JDT, WIS, SIR, BAR, 1MA, 2MA, 1ES, 3MA, MAN — asserted by
-  `src/state.test.ts`. How many the DRA supplies is **unverified**; count them
-  against the archive before relying on a number.
+  `metadata_only`: TOB, JDT, WIS, SIR, BAR, 1MA, 2MA, 1ES, 3MA, MAN. **Counted
+  8 September: the DRA supplies seven of them** — TOB, JDT, WIS, SIR, BAR, 1MA,
+  2MA — and not 1ES, 3MA or MAN. Asserted by `src/validate.test.ts`.
+- ~~The Douay-Rheims is ingested~~ **done 8 September.** `bun run build:data
+  --translation dra` passes every assertion and emits `src/data/dra/`: 35,811
+  verses, 73 books, 1,334 chapters. Its revision id is the archive sha256
+  `9dfbc526…` recorded here on 7 September, so the right archive was read.
+
+  `--report` prints what a source contains and asserts nothing, which is how an
+  edition gets characterised without the gate agreeing with whatever it was fed.
+  `src/expectations/dra.ts` was authored from that report after four
+  cross-checks: per-book verses summing to 35,811, printed order matching
+  `EDITION_ORDER.dra` with no mismatches, the ledger balancing exactly, and
+  every headline figure matching the 7 September measurement. An edition with
+  no expectation set can be reported on but never published.
+
+  One bug this surfaced: `manifest.json` was a single file at the repo root, so
+  the DRA build replaced the ASV's record with its own. Artifacts were already
+  safe under `src/data/<id>/`; the manifest now lives there too.
 - ~~Ingest must tolerate a source with **no `<d>` titles and no footnotes**~~
   **done 8 September, and it was never a parser change.** This file used to call
   it "the one parser change the DRA actually needs", contradicting its own note

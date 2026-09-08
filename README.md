@@ -225,9 +225,10 @@ The distinction only costs something the day it is missing. Correcting a canon
 date should retire every cached response but must not invalidate a coordinate
 someone saved into the text. One identifier gets exactly one of those right.
 
-`manifest.json` records what a generation is made of: source hash, artifact
-hashes, policy versions, and the corpus counts. Rebuilding from identical source
-reproduces the same `generation_id` byte for byte.
+`src/data/<translation>/manifest.json` records what a generation is made of:
+source hash, artifact hashes, policy versions, and the corpus counts. Rebuilding
+from identical source reproduces the same `generation_id` byte for byte. Each
+edition keeps its own, because each is a separate published thing.
 
 ## The canons
 

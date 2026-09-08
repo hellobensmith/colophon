@@ -15,6 +15,7 @@
 import type { EditionId } from "../src/canon.ts";
 import type { CorpusExpectations } from "../src/validate.ts";
 import { ASV } from "../src/expectations/asv.ts";
+import { DRA } from "../src/expectations/dra.ts";
 
 export interface BuildEdition {
   /** Registry id, and the directory the artifacts are written to. */
@@ -28,7 +29,15 @@ export interface BuildEdition {
    * recorded, never derived from {@link id}.
    */
   readonly sourceId: string;
-  readonly expectations: CorpusExpectations;
+  /**
+   * What this edition must contain for the build to emit anything.
+   *
+   * Absent until the edition has been measured once. A text cannot be
+   * characterised before it has been read, and inventing the numbers would
+   * defeat the gate — so an edition without a set can be reported on
+   * (`--report`) but not published.
+   */
+  readonly expectations?: CorpusExpectations;
 }
 
 const EDITIONS: readonly BuildEdition[] = [
@@ -36,6 +45,11 @@ const EDITIONS: readonly BuildEdition[] = [
     id: "asv",
     sourceId: "eng-asv",
     expectations: ASV,
+  },
+  {
+    id: "dra",
+    sourceId: "engDRA",
+    expectations: DRA,
   },
 ];
 

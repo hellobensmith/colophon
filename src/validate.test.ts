@@ -16,6 +16,7 @@
 import { describe, expect, test } from "bun:test";
 import { parseUsfx, type UsfxDocument } from "./usfx.ts";
 import { validateCorpus, ValidationError, type CorpusExpectations } from "./validate.ts";
+import { BOOKS } from "./canon.ts";
 
 /** A two-book document in the shape the real archives use. */
 function document(body: string): string {
@@ -178,6 +179,94 @@ describe("the conditional guards read their premise from the edition", () => {
     expect(
       failuresFrom(() => validateCorpus(doc, expectationsFor(doc, { expectsNotes: true }))).join(),
     ).toContain("no text reached any verse note");
+  });
+});
+
+describe("the two expectation sets describe two different texts", () => {
+  /**
+   * The failure worth guarding against is not a typo. It is an expectation set
+   * copied from a neighbour and lightly edited, which would pass its own build
+   * while asserting the wrong text's shape. These assert the ways the editions
+   * genuinely disagree, taken from the source measurement rather than from each
+   * other.
+   */
+  test("they disagree on everything structural", async () => {
+    const { ASV } = await import("./expectations/asv.ts");
+    const { DRA } = await import("./expectations/dra.ts");
+
+    expect(ASV.totalVerses).toBe(31_102);
+    expect(DRA.totalVerses).toBe(35_811);
+    expect(ASV.books.size).toBe(66);
+    expect(DRA.books.size).toBe(73);
+
+    // The DRA folds each psalm superscription into verse 1, so none are marked.
+    expect(ASV.titleCount).toBe(116);
+    expect(DRA.titleCount).toBe(0);
+    expect(ASV.subscriptions).toEqual(["HAB.3"]);
+    expect(DRA.subscriptions).toEqual([]);
+
+    // No footnotes means no verses printed as empty placeholders.
+    expect(ASV.expectsNotes).toBe(true);
+    expect(DRA.expectsNotes).toBe(false);
+    expect(ASV.emptyVerses.length).toBe(16);
+    expect(DRA.emptyVerses.length).toBe(0);
+
+    // <cl> chapter labels occur in the DRA and never in the ASV.
+    expect(DRA.dropped.has("cl")).toBe(true);
+    expect(ASV.dropped.has("cl")).toBe(false);
+  });
+
+  test("the DRA supplies seven of the ten books the ASV only describes", async () => {
+    const { DRA } = await import("./expectations/dra.ts");
+    const metadataOnly = [...BOOKS.values()]
+      .filter((book) => book.dataAvailability === "metadata_only")
+      .map((book) => book.id);
+    const supplied = metadataOnly.filter((id) => DRA.books.has(id));
+    expect(metadataOnly.length).toBe(10);
+    expect(supplied.sort()).toEqual(["1MA", "2MA", "BAR", "JDT", "SIR", "TOB", "WIS"]);
+  });
+
+  /**
+   * Read from the generated corpora rather than the expectation sets, which
+   * carry book-level totals only. The distinction turns out to matter: counted
+   * by totals, 24 shared books differ; counted chapter by chapter, 32 do.
+   * STATE.md's long-standing claim is the second one, and it is right.
+   */
+  test("32 of the 66 shared books are numbered differently", async () => {
+    const asv = (await import("./data/asv/meta.ts")).VERSE_COUNTS;
+    const dra = (await import("./data/dra/meta.ts")).VERSE_COUNTS;
+    const shared = Object.keys(asv).filter((id) => id in dra);
+    expect(shared.length).toBe(66);
+
+    const differing = shared.filter(
+      (id) => JSON.stringify(asv[id]) !== JSON.stringify(dra[id]),
+    );
+    expect(differing.length).toBe(32);
+  });
+
+  test("eight of them agree on every total and still disagree on the shape", async () => {
+    const asv = (await import("./data/asv/meta.ts")).VERSE_COUNTS;
+    const dra = (await import("./data/dra/meta.ts")).VERSE_COUNTS;
+    const sum = (counts: readonly number[]) => counts.reduce((total, n) => total + n, 0);
+
+    // The case that makes per-translation versification load-bearing rather
+    // than tidy. These books have the same chapter count and the same verse
+    // total in both editions, so any check at book level calls them identical —
+    // while the verses sit in different chapters. A coordinate resolved against
+    // the wrong edition here returns the wrong verse under a plausible-looking
+    // reference, which is precisely the failure the conformance suite records
+    // against other APIs.
+    const hidden = Object.keys(asv)
+      .filter((id) => id in dra)
+      .filter(
+        (id) =>
+          asv[id]!.length === dra[id]!.length &&
+          sum(asv[id]!) === sum(dra[id]!) &&
+          JSON.stringify(asv[id]) !== JSON.stringify(dra[id]),
+      )
+      .sort();
+
+    expect(hidden).toEqual(["ECC", "HAG", "ISA", "JDG", "JOB", "JON", "JOS", "NUM"]);
   });
 });
 

@@ -64,6 +64,9 @@ const EDITION: BuildEdition = (() => {
   }
 })();
 
+/** Report what the source contains without asserting or writing anything. */
+const REPORT_ONLY = process.argv.includes("--report");
+
 const SOURCE_URL = archiveUrl(EDITION);
 const CACHE_DIR = new URL("../.cache/", import.meta.url).pathname;
 const ZIP_PATH = `${CACHE_DIR}${EDITION.sourceId}_usfx.zip`;
@@ -294,6 +297,96 @@ export const TITLED_PSALMS: readonly number[] = [${titledPsalms.join(",")}];
 `;
 }
 
+/**
+ * What the source actually contains, printed rather than asserted.
+ *
+ * An edition cannot be characterised before it has been read, so this exists to
+ * break that circle honestly: it reports, a person reads, and the expectation
+ * set is authored from figures someone has looked at. Emitting the observations
+ * straight into an expectation set would produce a gate that agrees with
+ * whatever it was fed, which is worse than no gate because it looks like one.
+ *
+ * Nothing is written in this mode.
+ */
+function report(doc: UsfxDocument): void {
+  const byBook = new Map<string, Map<number, number>>();
+  for (const verse of doc.verses) {
+    let chapters = byBook.get(verse.book);
+    if (chapters === undefined) {
+      chapters = new Map<number, number>();
+      byBook.set(verse.book, chapters);
+    }
+    chapters.set(verse.chapter, (chapters.get(verse.chapter) ?? 0) + 1);
+  }
+
+  const sum = (bucket: ReadonlyMap<string, number>): number =>
+    [...bucket.values()].reduce((total, n) => total + n, 0);
+  const ledger = doc.ledger;
+  const accounted =
+    sum(ledger.toVerses) +
+    sum(ledger.toTitles) +
+    sum(ledger.toSubscriptions) +
+    sum(ledger.toNotes) +
+    sum(ledger.dropped) +
+    ledger.unattributed;
+
+  const empty = doc.verses.filter((verse) => verse.text === "").map((verse) => verse.bcv);
+  const unbalanced = doc.verses
+    .filter((verse) => {
+      const opens = (verse.text.match(/\[/g) ?? []).length;
+      const closes = (verse.text.match(/\]/g) ?? []).length;
+      return opens !== closes;
+    })
+    .map((verse) => verse.bcv);
+
+  console.log(`\nObserved in ${EDITION.id} (${EDITION.sourceId})`);
+  console.log("─".repeat(52));
+  console.log(`  verses          ${doc.verses.length.toLocaleString()}`);
+  console.log(`  books           ${doc.books.length}`);
+  console.log(`  superscriptions ${doc.titles.size}`);
+  console.log(`  subscriptions   ${doc.subscriptions.size}${
+    doc.subscriptions.size > 0 ? `  [${[...doc.subscriptions.keys()].join(", ")}]` : ""
+  }`);
+  console.log(`  verses w/ notes ${doc.verses.filter((verse) => verse.note !== null).length}`);
+  console.log(`  empty verses    ${empty.length}${empty.length > 0 ? `  [${empty.join(", ")}]` : ""}`);
+  console.log(
+    `  unbalanced [ ]  ${unbalanced.length}${unbalanced.length > 0 ? `  [${unbalanced.join(", ")}]` : ""}`,
+  );
+
+  console.log("\n  coverage ledger");
+  console.log(`    source        ${ledger.sourceCharacters.toLocaleString()}`);
+  console.log(`    accounted     ${accounted.toLocaleString()}`);
+  console.log(
+    `    balance       ${accounted === ledger.sourceCharacters ? "exact" : `${ledger.sourceCharacters - accounted} unexplained`}`,
+  );
+  console.log(`    to verses     ${sum(ledger.toVerses).toLocaleString()}`);
+  console.log(`    to titles     ${sum(ledger.toTitles).toLocaleString()}`);
+  console.log(`    to subs       ${sum(ledger.toSubscriptions).toLocaleString()}`);
+  console.log(`    to notes      ${sum(ledger.toNotes).toLocaleString()}`);
+  console.log(`    unattributed  ${ledger.unattributed.toLocaleString()}`);
+
+  console.log("\n  dropped as document furniture");
+  for (const [element, count] of [...ledger.dropped].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    console.log(`    <${element}>`.padEnd(20) + String(count).padStart(10));
+  }
+
+  console.log("\n  books, in the order the source prints them");
+  const order = EDITION_ORDER[EDITION.id];
+  for (const [index, bookId] of doc.books.entries()) {
+    const chapters = byBook.get(bookId);
+    const verses = chapters === undefined ? 0 : [...chapters.values()].reduce((s, n) => s + n, 0);
+    const expectedHere = order[index];
+    const flag = expectedHere === bookId ? "  " : ` ← canon.ts expects ${expectedHere ?? "nothing"}`;
+    console.log(
+      `    ${String(index + 1).padStart(2)} ${bookId}  ` +
+        `${String(chapters?.size ?? 0).padStart(3)} ch  ` +
+        `${String(verses).padStart(5)} v${flag}`,
+    );
+  }
+
+  console.log(`\nNothing written. Author src/expectations/${EDITION.id}.ts from the above.\n`);
+}
+
 async function main(): Promise<void> {
   console.log(`Building ${EDITION.id} (${EDITION.sourceId})`);
   console.log("Downloading USFX…");
@@ -309,6 +402,20 @@ async function main(): Promise<void> {
     `  ${doc.verses.length.toLocaleString()} verses, ${doc.books.length} books, ` +
       `${doc.titles.size} titles in ${(performance.now() - started).toFixed(0)} ms`,
   );
+
+  if (REPORT_ONLY) {
+    report(doc);
+    return;
+  }
+
+  if (EDITION.expectations === undefined) {
+    throw new Error(
+      `${EDITION.id} has no expectation set, so there is nothing to validate ` +
+        `it against and nothing will be written. Run with --report to see what ` +
+        `the source contains, then author src/expectations/${EDITION.id}.ts ` +
+        `from figures you have read rather than from whatever this run emitted.`,
+    );
+  }
 
   console.log("Validating…");
   validateCorpus(doc, EDITION.expectations);
@@ -380,8 +487,12 @@ async function main(): Promise<void> {
 
   // The manifest is committed so a reader can see what a generation is made of
   // without rebuilding it, and so a drift in identity is visible in a diff.
+  //
+  // One per edition. A single file at the root meant the second build silently
+  // replaced the first edition’s record with its own — the artifacts were
+  // already safe under src/data/<id>/, but their manifest was not.
   await Bun.write(
-    new URL("../manifest.json", import.meta.url).pathname,
+    `${DATA_DIR}manifest.json`,
     `${canonicalJson({ ...manifest, generationId })}\n`,
   );
 
