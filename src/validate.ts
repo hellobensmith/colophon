@@ -1,99 +1,68 @@
 /**
  * Corpus assertions. Run at build time by scripts/build-data.ts and again as a
  * test suite. Any failure is fatal: the build refuses to emit data modules that
- * do not match the known ASV versification.
+ * do not match what the edition is expected to contain.
+ *
+ * The assertions divide three ways, and the division is the whole design:
+ *
+ * - **Universal** — true of any Scripture edition. Chapters contiguous from 1,
+ *   verses contiguous within a chapter, no duplicate coordinate, the coverage
+ *   ledger balancing, no residual markup. These stay hardcoded, and they are
+ *   the ones that cannot be rubber-stamped: the ledger either sums or it does
+ *   not.
+ * - **Edition-specific** — the fingerprint of one text. Verse totals, per-book
+ *   counts, which verses are empty, how many superscriptions. These come in as
+ *   {@link CorpusExpectations}.
+ * - **Conditional** — guards that exist to catch routing which silently stopped
+ *   working, and which therefore need to know whether the edition has anything
+ *   to route. The ASV has 116 Psalm superscriptions; the Douay-Rheims has none,
+ *   because it folds each one into verse 1. An empty title bucket is a bug in
+ *   the first case and correct in the second.
  */
 
 import type { UsfxDocument } from "./usfx.ts";
-import { PROTESTANT_ORDER } from "./canon.ts";
-
-/** Total verses in the traditional ASV/KJV versification. */
-export const EXPECTED_TOTAL_VERSES = 31_102;
+import { EDITION_ORDER, type EditionId } from "./canon.ts";
 
 /**
- * Chapter and verse totals for each of the 66 books, in the traditional
- * ASV/KJV versification. These are the counts the ebible.org USFX edition must
- * reproduce exactly.
- */
-export const EXPECTED_BOOKS: ReadonlyMap<string, { chapters: number; verses: number }> =
-  new Map([
-    ["GEN", { chapters: 50, verses: 1533 }], ["EXO", { chapters: 40, verses: 1213 }],
-    ["LEV", { chapters: 27, verses: 859 }],  ["NUM", { chapters: 36, verses: 1288 }],
-    ["DEU", { chapters: 34, verses: 959 }],  ["JOS", { chapters: 24, verses: 658 }],
-    ["JDG", { chapters: 21, verses: 618 }],  ["RUT", { chapters: 4, verses: 85 }],
-    ["1SA", { chapters: 31, verses: 810 }],  ["2SA", { chapters: 24, verses: 695 }],
-    ["1KI", { chapters: 22, verses: 816 }],  ["2KI", { chapters: 25, verses: 719 }],
-    ["1CH", { chapters: 29, verses: 942 }],  ["2CH", { chapters: 36, verses: 822 }],
-    ["EZR", { chapters: 10, verses: 280 }],  ["NEH", { chapters: 13, verses: 406 }],
-    ["EST", { chapters: 10, verses: 167 }],  ["JOB", { chapters: 42, verses: 1070 }],
-    ["PSA", { chapters: 150, verses: 2461 }],["PRO", { chapters: 31, verses: 915 }],
-    ["ECC", { chapters: 12, verses: 222 }],  ["SNG", { chapters: 8, verses: 117 }],
-    ["ISA", { chapters: 66, verses: 1292 }], ["JER", { chapters: 52, verses: 1364 }],
-    ["LAM", { chapters: 5, verses: 154 }],   ["EZK", { chapters: 48, verses: 1273 }],
-    ["DAN", { chapters: 12, verses: 357 }],  ["HOS", { chapters: 14, verses: 197 }],
-    ["JOL", { chapters: 3, verses: 73 }],    ["AMO", { chapters: 9, verses: 146 }],
-    ["OBA", { chapters: 1, verses: 21 }],    ["JON", { chapters: 4, verses: 48 }],
-    ["MIC", { chapters: 7, verses: 105 }],   ["NAM", { chapters: 3, verses: 47 }],
-    ["HAB", { chapters: 3, verses: 56 }],    ["ZEP", { chapters: 3, verses: 53 }],
-    ["HAG", { chapters: 2, verses: 38 }],    ["ZEC", { chapters: 14, verses: 211 }],
-    ["MAL", { chapters: 4, verses: 55 }],    ["MAT", { chapters: 28, verses: 1071 }],
-    ["MRK", { chapters: 16, verses: 678 }],  ["LUK", { chapters: 24, verses: 1151 }],
-    ["JHN", { chapters: 21, verses: 879 }],  ["ACT", { chapters: 28, verses: 1007 }],
-    ["ROM", { chapters: 16, verses: 433 }],  ["1CO", { chapters: 16, verses: 437 }],
-    ["2CO", { chapters: 13, verses: 257 }],  ["GAL", { chapters: 6, verses: 149 }],
-    ["EPH", { chapters: 6, verses: 155 }],   ["PHP", { chapters: 4, verses: 104 }],
-    ["COL", { chapters: 4, verses: 95 }],    ["1TH", { chapters: 5, verses: 89 }],
-    ["2TH", { chapters: 3, verses: 47 }],    ["1TI", { chapters: 6, verses: 113 }],
-    ["2TI", { chapters: 4, verses: 83 }],    ["TIT", { chapters: 3, verses: 46 }],
-    ["PHM", { chapters: 1, verses: 25 }],    ["HEB", { chapters: 13, verses: 303 }],
-    ["JAS", { chapters: 5, verses: 108 }],   ["1PE", { chapters: 5, verses: 105 }],
-    ["2PE", { chapters: 3, verses: 61 }],    ["1JN", { chapters: 5, verses: 105 }],
-    ["2JN", { chapters: 1, verses: 13 }],    ["3JN", { chapters: 1, verses: 14 }],
-    ["JUD", { chapters: 1, verses: 25 }],    ["REV", { chapters: 22, verses: 404 }],
-  ]);
-
-/**
- * The 16 verses the ASV omits from its text, retained as numbered placeholders
- * carrying only a footnote. They are expected to have empty text and a note.
- */
-export const EXPECTED_EMPTY_VERSES: readonly string[] = [
-  "MAT.17.21", "MAT.18.11", "MAT.23.14",
-  "MRK.7.16", "MRK.9.44", "MRK.9.46", "MRK.11.26", "MRK.15.28",
-  "LUK.17.36", "LUK.23.17",
-  "JHN.5.4",
-  "ACT.8.37", "ACT.15.34", "ACT.24.7", "ACT.28.29",
-  "ROM.16.24",
-];
-
-/**
- * The 116 Psalms carrying a superscription ("A Psalm of David.").
- * Every `<d>` in the ASV outside these is the single Habakkuk 3 subscription.
- */
-export const EXPECTED_TITLE_COUNT = 116;
-
-/**
- * Habakkuk 3 closes with "For the Chief Musician, on my stringed instruments",
- * printed below verse 19. It uses the same `<d>` element as a superscription,
- * so a parser that keys on the element alone files it as a chapter heading.
- */
-export const EXPECTED_SUBSCRIPTIONS: readonly string[] = ["HAB.3"];
-
-/**
- * Characters the parser drops on purpose, by element — the lossy inventory.
- * These are document furniture, not scripture: the book id line, the running
- * header, table-of-contents entries, the language code, and footnote callers.
+ * What one edition is expected to contain.
  *
- * Asserted rather than merely reported. A change here means the source's shape
- * changed, and the question of whether text moved from a kept element to a
- * dropped one deserves an answer before the corpus is republished.
+ * Authored by hand, never derived from `src/data/*` — see the note in
+ * `src/expectations/asv.ts`.
+ *
+ * Book order normally comes from `EDITION_ORDER` rather than being repeated
+ * here: `doc.books` is the order the source prints, and canon.ts already
+ * records that per edition.
  */
-export const EXPECTED_DROPPED: ReadonlyMap<string, number> = new Map([
-  ["languageCode", 3],
-  ["id", 1904],
-  ["h", 585],
-  ["toc", 2809],
-  ["fr", 89],
-]);
+export interface CorpusExpectations {
+  readonly editionId: EditionId;
+  /**
+   * The order this edition prints its books, when canon.ts does not already
+   * know it. Defaults to `EDITION_ORDER[editionId]`.
+   *
+   * This is the seam for the case the project exists to serve: a publisher
+   * self-hosting a text whose printing order is theirs, not one of ours. They
+   * should be able to validate their own corpus without editing canon.ts.
+   */
+  readonly order?: readonly string[];
+  readonly totalVerses: number;
+  readonly books: ReadonlyMap<string, { chapters: number; verses: number }>;
+  /** Verses printed as numbered placeholders with no text, carrying a note. */
+  readonly emptyVerses: readonly string[];
+  /** Chapter superscriptions, all of which must sit in the Psalter. */
+  readonly titleCount: number;
+  /** Chapters closing with a line printed below the last verse. */
+  readonly subscriptions: readonly string[];
+  /**
+   * Whether any verse carries a footnote. Explicit rather than inferred from
+   * `emptyVerses`, because an edition may footnote without omitting anything,
+   * and a guard that is quietly approximate is worse than one more field.
+   */
+  readonly expectsNotes: boolean;
+  /** Characters dropped on purpose, by element — the lossy inventory. */
+  readonly dropped: ReadonlyMap<string, number>;
+  /** Verses whose brackets legitimately do not balance. */
+  readonly unbalancedBrackets: readonly string[];
+}
 
 export class ValidationError extends Error {
   constructor(public readonly failures: readonly string[]) {
@@ -103,12 +72,16 @@ export class ValidationError extends Error {
 }
 
 /** Throws ValidationError listing every discrepancy, rather than the first. */
-export function validateCorpus(doc: UsfxDocument): void {
+export function validateCorpus(
+  doc: UsfxDocument,
+  expected: CorpusExpectations,
+): void {
   const failures: string[] = [];
+  const order = expected.order ?? EDITION_ORDER[expected.editionId];
 
-  if (doc.verses.length !== EXPECTED_TOTAL_VERSES) {
+  if (doc.verses.length !== expected.totalVerses) {
     failures.push(
-      `total verses: expected ${EXPECTED_TOTAL_VERSES}, got ${doc.verses.length}`,
+      `total verses: expected ${expected.totalVerses}, got ${doc.verses.length}`,
     );
   }
 
@@ -122,13 +95,13 @@ export function validateCorpus(doc: UsfxDocument): void {
     chapters.set(verse.chapter, (chapters.get(verse.chapter) ?? 0) + 1);
   }
 
-  if (doc.books.length !== PROTESTANT_ORDER.length) {
+  if (doc.books.length !== order.length) {
     failures.push(
-      `book count: expected ${PROTESTANT_ORDER.length}, got ${doc.books.length}`,
+      `book count: expected ${order.length}, got ${doc.books.length}`,
     );
   }
   for (const [index, bookId] of doc.books.entries()) {
-    const expectedId = PROTESTANT_ORDER[index];
+    const expectedId = order[index];
     if (expectedId !== bookId) {
       failures.push(
         `book order at position ${index + 1}: expected ${expectedId ?? "none"}, got ${bookId}`,
@@ -136,29 +109,29 @@ export function validateCorpus(doc: UsfxDocument): void {
     }
   }
 
-  for (const [bookId, expected] of EXPECTED_BOOKS) {
+  for (const [bookId, counts] of expected.books) {
     const chapters = byBook.get(bookId);
     if (chapters === undefined) {
       failures.push(`${bookId}: missing entirely`);
       continue;
     }
     const verseTotal = [...chapters.values()].reduce((sum, n) => sum + n, 0);
-    if (chapters.size !== expected.chapters) {
+    if (chapters.size !== counts.chapters) {
       failures.push(
-        `${bookId} chapters: expected ${expected.chapters}, got ${chapters.size}`,
+        `${bookId} chapters: expected ${counts.chapters}, got ${chapters.size}`,
       );
     }
-    if (verseTotal !== expected.verses) {
-      failures.push(`${bookId} verses: expected ${expected.verses}, got ${verseTotal}`);
+    if (verseTotal !== counts.verses) {
+      failures.push(`${bookId} verses: expected ${counts.verses}, got ${verseTotal}`);
     }
     // Chapters must be contiguous from 1..n with no gaps.
-    for (let chapter = 1; chapter <= expected.chapters; chapter += 1) {
+    for (let chapter = 1; chapter <= counts.chapters; chapter += 1) {
       if (!chapters.has(chapter)) failures.push(`${bookId} ${chapter}: missing chapter`);
     }
   }
 
   for (const bookId of byBook.keys()) {
-    if (!EXPECTED_BOOKS.has(bookId)) failures.push(`${bookId}: unexpected book in source`);
+    if (!expected.books.has(bookId)) failures.push(`${bookId}: unexpected book in source`);
   }
 
   // Verses must be contiguous from 1..n within every chapter.
@@ -178,22 +151,22 @@ export function validateCorpus(doc: UsfxDocument): void {
   }
 
   const empty = doc.verses.filter((verse) => verse.text === "").map((verse) => verse.bcv);
-  const expectedEmpty = [...EXPECTED_EMPTY_VERSES].sort();
+  const expectedEmpty = [...expected.emptyVerses].sort();
   if (JSON.stringify([...empty].sort()) !== JSON.stringify(expectedEmpty)) {
     failures.push(
       `empty verses: expected [${expectedEmpty.join(", ")}], got [${[...empty].sort().join(", ")}]`,
     );
   }
-  for (const bcv of EXPECTED_EMPTY_VERSES) {
+  for (const bcv of expected.emptyVerses) {
     const verse = doc.verses.find((candidate) => candidate.bcv === bcv);
     if (verse !== undefined && verse.note === null) {
       failures.push(`${bcv}: omitted verse is missing its explanatory note`);
     }
   }
 
-  if (doc.titles.size !== EXPECTED_TITLE_COUNT) {
+  if (doc.titles.size !== expected.titleCount) {
     failures.push(
-      `superscriptions: expected ${EXPECTED_TITLE_COUNT}, got ${doc.titles.size}`,
+      `superscriptions: expected ${expected.titleCount}, got ${doc.titles.size}`,
     );
   }
   for (const key of doc.titles.keys()) {
@@ -202,9 +175,9 @@ export function validateCorpus(doc: UsfxDocument): void {
     }
   }
   const subscriptions = [...doc.subscriptions.keys()].sort();
-  if (JSON.stringify(subscriptions) !== JSON.stringify([...EXPECTED_SUBSCRIPTIONS].sort())) {
+  if (JSON.stringify(subscriptions) !== JSON.stringify([...expected.subscriptions].sort())) {
     failures.push(
-      `subscriptions: expected [${EXPECTED_SUBSCRIPTIONS.join(", ")}], got [${subscriptions.join(", ")}]`,
+      `subscriptions: expected [${expected.subscriptions.join(", ")}], got [${subscriptions.join(", ")}]`,
     );
   }
 
@@ -218,7 +191,7 @@ export function validateCorpus(doc: UsfxDocument): void {
     })
     .map((verse) => verse.bcv)
     .sort();
-  const expectedUnbalanced = ["JHN.7.53", "JHN.8.11"];
+  const expectedUnbalanced = [...expected.unbalancedBrackets].sort();
   if (JSON.stringify(unbalanced) !== JSON.stringify(expectedUnbalanced)) {
     failures.push(
       `unbalanced brackets: expected only [${expectedUnbalanced.join(", ")}], got [${unbalanced.join(", ")}]`,
@@ -251,24 +224,31 @@ export function validateCorpus(doc: UsfxDocument): void {
     );
   }
 
-  for (const [element, expected] of EXPECTED_DROPPED) {
+  for (const [element, characters] of expected.dropped) {
     const actual = ledger.dropped.get(element) ?? 0;
-    if (actual !== expected) {
-      failures.push(`dropped <${element}>: expected ${expected} characters, got ${actual}`);
+    if (actual !== characters) {
+      failures.push(`dropped <${element}>: expected ${characters} characters, got ${actual}`);
     }
   }
   for (const element of ledger.dropped.keys()) {
-    if (!EXPECTED_DROPPED.has(element)) {
+    if (!expected.dropped.has(element)) {
       failures.push(`<${element}>: dropping text that was not previously dropped`);
     }
   }
 
-  // The superscription of a titled Psalm must reach the title bucket, and
-  // Habakkuk's closing line the subscription bucket. Empty buckets would mean
-  // the routing silently stopped working.
-  if (sum(ledger.toTitles) === 0) failures.push("no text reached any chapter superscription");
-  if (sum(ledger.toSubscriptions) === 0) failures.push("no text reached any chapter subscription");
-  if (sum(ledger.toNotes) === 0) failures.push("no text reached any verse note");
+  // An empty bucket means routing silently stopped working — but only if this
+  // edition has anything to route. The Douay-Rheims has no superscriptions, no
+  // subscriptions and no footnotes at all, so for it an empty bucket is the
+  // correct result rather than a broken one.
+  if (expected.titleCount > 0 && sum(ledger.toTitles) === 0) {
+    failures.push("no text reached any chapter superscription");
+  }
+  if (expected.subscriptions.length > 0 && sum(ledger.toSubscriptions) === 0) {
+    failures.push("no text reached any chapter subscription");
+  }
+  if (expected.expectsNotes && sum(ledger.toNotes) === 0) {
+    failures.push("no text reached any verse note");
+  }
 
   const withMarkup = doc.verses.filter((verse) => /[<>]/.test(verse.text));
   if (withMarkup.length > 0) {

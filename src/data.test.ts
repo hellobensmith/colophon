@@ -5,7 +5,7 @@ import {
   EXPECTED_SUBSCRIPTIONS,
   EXPECTED_TITLE_COUNT,
   EXPECTED_TOTAL_VERSES,
-} from "./validate.ts";
+} from "./expectations/asv.ts";
 import { VERSE_COUNTS, TITLES, SUBSCRIPTIONS, NOTES, TITLED_PSALMS } from "./data/meta.ts";
 import {
   TOTAL_VERSES,

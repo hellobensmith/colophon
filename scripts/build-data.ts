@@ -13,6 +13,7 @@ import { createHash } from "node:crypto";
 
 import { parseUsfx, type UsfxDocument } from "../src/usfx.ts";
 import { validateCorpus, ValidationError } from "../src/validate.ts";
+import { ASV } from "../src/expectations/asv.ts";
 import { PROTESTANT_ORDER } from "../src/canon.ts";
 import { buildFamilies } from "../src/morphology.ts";
 import { tokenize } from "../src/tokenize.ts";
@@ -277,7 +278,7 @@ async function main(): Promise<void> {
   );
 
   console.log("Validating…");
-  validateCorpus(doc);
+  validateCorpus(doc, ASV);
   console.log("  all assertions passed");
 
   console.log("Building artifacts…");

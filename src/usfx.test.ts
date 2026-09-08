@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { parseUsfx, UnknownElementError } from "./usfx.ts";
-import { EXPECTED_DROPPED } from "./validate.ts";
+import { EXPECTED_DROPPED } from "./expectations/asv.ts";
 
 /**
  * A minimal document in the shape the real archive uses: milestone verses, text

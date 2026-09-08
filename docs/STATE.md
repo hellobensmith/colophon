@@ -141,10 +141,37 @@ measurement rather than assumed:
   `metadata_only`: TOB, JDT, WIS, SIR, BAR, 1MA, 2MA, 1ES, 3MA, MAN — asserted by
   `src/state.test.ts`. How many the DRA supplies is **unverified**; count them
   against the archive before relying on a number.
-- Ingest must tolerate a source with **no `<d>` titles and no footnotes**. The
-  ASV path assumes both exist.
-- `build:data` and `validate.ts` currently hard-code the ASV source URL and its
-  assertions; both need to run per translation.
+- ~~Ingest must tolerate a source with **no `<d>` titles and no footnotes**~~
+  **done 8 September, and it was never a parser change.** This file used to call
+  it "the one parser change the DRA actually needs", contradicting its own note
+  above that the DRA parsed with `parseUsfx` unchanged. What refused a
+  title-less corpus was `src/validate.ts`, whose bucket guards asserted that
+  text had reached the title, subscription and note buckets. Those guards exist
+  to catch routing that silently stopped working, so they now read their premise
+  from the edition: an empty title bucket fails only where the edition claims
+  superscriptions.
+- ~~`validate.ts` hard-codes the ASV's assertions~~ **done 8 September.**
+  `validateCorpus(doc, expected)` takes a `CorpusExpectations`;
+  `src/expectations/asv.ts` holds the ASV's. The assertions now sort three ways
+  — universal (contiguity, the coverage ledger, residual markup), edition-specific
+  (totals, per-book counts, empty verses, dropped-character inventory), and
+  conditional (the bucket guards above). Proven by regenerating the whole corpus
+  through the rewritten gate: `src/data/` came back byte-identical and neither
+  identifier moved.
+
+  Expectations are hand-authored and must never be derived from `src/data/*` —
+  a gate that checks its output against numbers taken from that output passes on
+  any corpus. The duplication between `books` and the generated `VERSE_COUNTS`
+  is the test.
+
+  `src/validate.test.ts` exercises the gate itself in both directions: with
+  `titleCount: 0` an empty title bucket passes, with `titleCount: 116` it fails.
+  Writing those tests surfaced a design gap — book order came from
+  `EDITION_ORDER`, so no small fixture could exist. `CorpusExpectations.order`
+  now overrides it, which is also how a publisher validates a text canon.ts has
+  never heard of.
+- `build:data` still hard-codes the ASV source URL and emits to `src/data/`;
+  making it per-translation, writing to `src/data/<id>/`, is next.
 
 The per-Worker federation idea is worth keeping as a *vision* question — it is
 how a publisher self-hosts their own text — but it is no longer forced by any
