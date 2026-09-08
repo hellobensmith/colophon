@@ -71,7 +71,7 @@ describe("it refuses rather than guessing", () => {
     const empty = path.join(dir, "empty");
     await mkdir(empty, { recursive: true });
     await Bun.write(path.join(empty, "readme.txt"), "hello");
-    await expect(readLocal(empty)).rejects.toThrow(/no \.usx or \.xml files/);
+    await expect(readLocal(empty)).rejects.toThrow(/no \.usx, \.usfm/);
   });
 
   test("--source with no path is an error, not a silent default", () => {

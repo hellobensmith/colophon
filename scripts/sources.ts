@@ -42,12 +42,13 @@ export interface SourceDocument {
   readonly bytes: Uint8Array;
 }
 
-const USX_EXTENSIONS = new Set([".usx", ".xml"]);
+/** Per-book file extensions a bundle may use. */
+const BOOK_EXTENSIONS = new Set([".usx", ".usfm", ".sfm", ".xml"]);
 
 /**
  * Reads a local source into a single document.
  *
- * A directory is read as a USX bundle: every `.usx` file, in filename order,
+ * A directory is read as a per-book bundle: every book file, in filename order,
  * concatenated inside one wrapper so the parser sees one stream. Filename order
  * is what DBL bundles rely on to express canonical order, and sorting is done
  * with an explicit comparator rather than the default, whose behaviour depends
@@ -73,14 +74,14 @@ export async function readLocal(target: string): Promise<SourceDocument> {
   }
 
   const entries = (await readdir(resolved))
-    .filter((name) => USX_EXTENSIONS.has(path.extname(name).toLowerCase()))
+    .filter((name) => BOOK_EXTENSIONS.has(path.extname(name).toLowerCase()))
     .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
   if (entries.length === 0) {
     throw new Error(
-      `${target} holds no .usx or .xml files. A Digital Bible Library bundle ` +
-        `keeps them under a "release/USX_1" directory or similar; point ` +
-        `--source at the directory that actually contains the files.`,
+      `${target} holds no .usx, .usfm, .sfm or .xml files. A Digital Bible ` +
+        `Library bundle keeps them under a "release/USX_1" directory or ` +
+        `similar; point --source at the directory that actually holds them.`,
     );
   }
 

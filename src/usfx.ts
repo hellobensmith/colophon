@@ -116,7 +116,7 @@ export class UnknownElementError extends Error {
  * parser that balanced brackets per verse would corrupt real textual apparatus
  * to fix a markup artifact.
  */
-function closeSelahBracket(text: string): string {
+export function closeSelahBracket(text: string): string {
   const opens = (text.match(/\[/g) ?? []).length;
   const closes = (text.match(/\]/g) ?? []).length;
   return opens > closes ? `${text}${"]".repeat(opens - closes)}` : text;
