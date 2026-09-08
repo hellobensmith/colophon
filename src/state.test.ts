@@ -20,10 +20,14 @@
  * expected value here to match. Git history is the record of what changed.
  */
 import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { BOOKS } from "./canon.ts";
 import { TOTAL_VERSES } from "./corpus.ts";
 import { versificationOf, TRANSLATION_IDS, DEFAULT_TRANSLATION } from "./translations.ts";
 import { REVISION_ID, GENERATION_ID } from "./data/meta.ts";
+import { chapterCount } from "./parser.ts";
+import { verseAt } from "./corpus.ts";
+import { greekVerseCount, numberedVerses } from "./psalms.ts";
 
 const STATE = await Bun.file(
   new URL("../docs/STATE.md", import.meta.url),
@@ -79,6 +83,107 @@ describe("docs/STATE.md matches the code it describes", () => {
 
   test("GENERATION_ID prefix", () => {
     expect(GENERATION_ID.startsWith(claimed("GENERATION_ID").replace(/…$/, ""))).toBe(true);
+  });
+});
+
+/**
+ * Everything the file says about the code, not just the facts table.
+ *
+ * Prose rots the same way numbers do, only more quietly: a symbol gets renamed,
+ * a script disappears from package.json, a path moves. All of that is
+ * mechanical, so none of it needs to be anyone's job to remember.
+ */
+describe("STATE.md references nothing that has been removed", () => {
+  // A symbol deliberately named as gone is struck through. Everything else
+  // backticked must still resolve, or the sentence around it is describing a
+  // codebase that no longer exists.
+  const prose = STATE.replace(/~~[^~]+~~/g, "");
+
+  test("every code symbol still exists", async () => {
+    let body = "";
+    for (const file of new Bun.Glob("{src,scripts,conformance}/**/*.ts").scanSync(".")) {
+      body += await Bun.file(file).text();
+    }
+    const symbols = new Set(
+      [...prose.matchAll(/`([A-Z][A-Z0-9_]{2,}|[a-z][a-zA-Z0-9]*\(\))`/g)].map((m) =>
+        m[1]!.replace(/\(\)$/, ""),
+      ),
+    );
+    expect(symbols.size).toBeGreaterThan(5);
+    const dead = [...symbols].filter((name) => !body.includes(name)).sort();
+    expect(dead).toEqual([]);
+  });
+
+  test("every file path still exists", async () => {
+    const paths = new Set(
+      [...prose.matchAll(/`((?:src|scripts|conformance|docs)\/[A-Za-z0-9_./-]+)`/g)].map(
+        (m) => m[1]!,
+      ),
+    );
+    expect(paths.size).toBeGreaterThan(5);
+    // existsSync, not Bun.file().exists() — the latter reports false for a
+    // directory, and STATE.md legitimately points at src/data/.
+    expect([...paths].filter((p) => !existsSync(p)).sort()).toEqual([]);
+  });
+
+  test("every documented command is defined in package.json", async () => {
+    const pkg = JSON.parse(await Bun.file("package.json").text()) as {
+      scripts: Record<string, string>;
+    };
+    const commands = new Set([...prose.matchAll(/bun run ([a-z:]+)/g)].map((m) => m[1]!));
+    expect(commands.size).toBeGreaterThan(3);
+    expect([...commands].filter((c) => !(c in pkg.scripts)).sort()).toEqual([]);
+  });
+});
+
+describe("STATE.md's prose numbers match the corpus", () => {
+  // These are stated in sentences rather than the facts table, and were just as
+  // capable of drifting.
+  test("Esther and Daniel chapter counts", () => {
+    expect(STATE).toContain(`EST is ${chapterCount("EST")} chapters in the ASV`);
+    expect(STATE).toMatch(new RegExp(`DAN is ${chapterCount("DAN")} and`));
+  });
+
+  test("empty verse count", () => {
+    let empty = 0;
+    for (let sequence = 1; sequence <= TOTAL_VERSES; sequence += 1) {
+      if (verseAt(sequence).text.trim() === "") empty += 1;
+    }
+    expect(STATE).toContain(`where the ASV has ${empty}`);
+  });
+
+  test("the Greek/Hebrew psalm splits it cites actually sum", () => {
+    const claims: [string, number, number][] = [
+      ["Greek 114+115", greekVerseCount(114) + greekVerseCount(115), numberedVerses(116)],
+      ["Greek 146+147", greekVerseCount(146) + greekVerseCount(147), numberedVerses(147)],
+      ["Greek 113", greekVerseCount(113), numberedVerses(114) + numberedVerses(115)],
+    ];
+    for (const [label, left, right] of claims) {
+      expect(left).toBe(right);
+      // and the file quotes the same total
+      expect(STATE).toContain(`${label} = ${left}`);
+    }
+  });
+});
+
+describe("STATE.md's stated sums add up", () => {
+  // Arithmetic quoted in prose needs no source of truth beyond itself, and a
+  // ledger that stops balancing is exactly the kind of error worth catching.
+  test("the DRA coverage ledger balances", () => {
+    const m = STATE.match(
+      /\(([\d,]+) source characters = ([\d,]+) emitted \+ ([\d,]+) dropped \+ ([\d,]+)\s*\n?\s*unattributed\)/,
+    );
+    expect(m).not.toBeNull();
+    const n = (v: string) => Number(v.replace(/,/g, ""));
+    expect(n(m![2]!) + n(m![3]!) + n(m![4]!)).toBe(n(m![1]!));
+  });
+
+  test("the psalm comparison tallies to the stated total", () => {
+    const total = Number(STATE.match(/Of the (\d+)\s*\n?directly comparable psalms/)![1]!);
+    const exact = Number(STATE.match(/psalms, (\d+) match exactly/)![1]!);
+    const one = Number(STATE.match(/(\d+) read one higher/)![1]!);
+    const two = Number(STATE.match(/\*\*(\d+) read two higher/)![1]!);
+    expect(exact + one + two).toBe(total);
   });
 });
 

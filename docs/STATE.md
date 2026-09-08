@@ -363,8 +363,10 @@ and memoises the derived tables in `versificationOf(id)`, lazily: cold start
 lands on whichever request an isolate serves first, so an edition nobody asks
 for is never built. `src/parser.ts` no longer imports `VERSE_COUNTS` at all —
 `chapterCount`, `verseCount`, `sequenceOf` and `locate` each take a translation,
-defaulting to the ASV, and `BOOK_START` / `CHAPTER_OFFSET` / `BOOK_STARTS` are
-gone as module globals.
+defaulting to the ASV, and ~~`BOOK_START`~~ / ~~`CHAPTER_OFFSET`~~ /
+~~`BOOK_STARTS`~~ are gone as module globals. (Struck through because they no
+longer exist: `src/state.test.ts` treats a struck symbol as deliberately dead
+and every other backticked symbol as one that must still resolve.)
 
 Proven byte-identical: `scripts/snapshot-responses.ts` captures 40 responses
 weighted to book and chapter boundaries, the corpus edges, Psalm
