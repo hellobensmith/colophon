@@ -28,7 +28,8 @@ import {
   subscription,
   verseAt,
   verseByReference,
-  TOTAL_VERSES,
+  totalVersesOf,
+  identityOf,
   type CorpusVerse,
 } from "./corpus.ts";
 import { search, countQueryTerms, MAX_QUERY_TERMS } from "./search.ts";
@@ -38,7 +39,13 @@ import {
   resolveTranslation,
   UnknownTranslationError,
 } from "./translations.ts";
-import { TITLED_PSALMS, REVISION_ID, GENERATION_ID, EDITION_ID } from "./data/asv/meta.ts";
+import { TITLED_PSALMS } from "./data/asv/meta.ts";
+
+/**
+ * The one edition the inverted index covers. Everything else this deployment
+ * serves works for passages and books; only search is still single-edition.
+ */
+const SEARCHABLE_TRANSLATION = "asv";
 
 /** Longest passage served in one response. */
 const MAX_PASSAGE_VERSES = 500;
@@ -145,8 +152,9 @@ app.use(
  */
 app.use("*", async (context, next) => {
   await next();
-  context.header("x-generation-id", GENERATION_ID);
-  context.header("x-revision-id", REVISION_ID);
+  const identity = identityOf(translationOf(context).meta.id);
+  context.header("x-generation-id", identity.generationId);
+  context.header("x-revision-id", identity.revisionId);
 });
 
 /*
@@ -221,10 +229,15 @@ app.get("/health", (context) => {
   return context.json({
     status: "ok",
     database: "embedded",
-    edition_id: EDITION_ID,
-    revision_id: REVISION_ID,
-    generation_id: GENERATION_ID,
-    verse_count: TOTAL_VERSES,
+    ...(() => {
+      const identity = identityOf(translation.meta.id);
+      return {
+        edition_id: identity.editionId,
+        revision_id: identity.revisionId,
+        generation_id: identity.generationId,
+      };
+    })(),
+    verse_count: totalVersesOf(translation.meta.id),
     // Stated here, not only in the README: a consumer should be able to learn
     // its obligations from the API rather than from prose it may never read.
     translation: translation.meta,
@@ -284,7 +297,7 @@ app.get("/books/:id/chapters/:num", (context) => {
   const verses = [];
   const count = verseCount(id, chapter, translation.meta.id);
   for (let number = 1; number <= count; number += 1) {
-    const verse = verseByReference(id, chapter, number);
+    const verse = verseByReference(id, chapter, number, translation.meta.id);
     verses.push({
       id: verse.id,
       number: verse.verse,
@@ -299,8 +312,8 @@ app.get("/books/:id/chapters/:num", (context) => {
     id: `${id}.${chapter}`,
     book_id: id,
     chapter,
-    descriptive_title: descriptiveTitle(id, chapter),
-    subscription: subscription(id, chapter),
+    descriptive_title: descriptiveTitle(id, chapter, translation.meta.id),
+    subscription: subscription(id, chapter, translation.meta.id),
     verses,
   });
 });
@@ -348,7 +361,7 @@ app.get("/passages", (context) => {
   const verses = [];
   if (parsed.includeTitle) {
     const chapter = parsed.titleChapter ?? parsed.segments[0]?.start.chapter ?? 1;
-    const title = descriptiveTitle(parsed.book, chapter);
+    const title = descriptiveTitle(parsed.book, chapter, translation.meta.id);
     if (title !== null) {
       verses.push({
         id: `${parsed.book}.${chapter}.0`,
@@ -362,7 +375,7 @@ app.get("/passages", (context) => {
   }
   for (const segment of parsed.segments) {
     for (let sequence = segment.start.sequence; sequence <= segment.end.sequence; sequence += 1) {
-      verses.push(serializePassageVerse(verseAt(sequence)));
+      verses.push(serializePassageVerse(verseAt(sequence, translation.meta.id)));
     }
   }
 
@@ -377,6 +390,18 @@ app.get("/passages", (context) => {
 
 app.get("/search", (context) => {
   const translation = translationOf(context);
+  // The inverted index is built over one edition. Answering from it while
+  // labelling the response with another translation would be the silent wrong
+  // answer the conformance suite records against other APIs, so say so instead.
+  if (translation.meta.id !== SEARCHABLE_TRANSLATION) {
+    throw new HttpError(
+      501,
+      "not_implemented",
+      `Search is not available for ${translation.meta.name} yet; the index ` +
+        `covers ${SEARCHABLE_TRANSLATION} only. Passages and books work for ` +
+        `every translation this deployment serves.`,
+    );
+  }
   const query = context.req.query("q") ?? "";
   if (query.trim().length < MIN_QUERY_LENGTH) {
     throw new HttpError(

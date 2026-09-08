@@ -244,11 +244,18 @@ function ensureAvailable(
   raw: string,
   translation: string = DEFAULT_TRANSLATION,
 ): string {
+  // Whether a book is available is a fact about *this edition*, not about the
+  // canon. `dataAvailability` in canon.ts is derived globally — every
+  // deuterocanonical book is marked metadata_only there — so consulting it
+  // first would refuse Tobit for the Douay-Rheims, which prints all fourteen
+  // chapters of it. The edition's own verse counts are the authority; the canon
+  // metadata only explains *why* something is missing.
+  if (versificationOf(translation).verseCounts[bookId] !== undefined) {
+    return bookId;
+  }
+
   const meta = BOOKS.get(bookId);
-  if (meta !== undefined && meta.dataAvailability === "metadata_only") {
-    // Named from the registry rather than hardcoded: which books are only
-    // metadata is a fact about the edition, so the message has to say which
-    // edition it is talking about.
+  if (meta !== undefined) {
     throw new ParseError(
       `${meta.name} is not present in the ` +
         `${resolveTranslation(translation).meta.name}; ` +
@@ -256,10 +263,7 @@ function ensureAvailable(
       "unavailable",
     );
   }
-  if (versificationOf(translation).verseCounts[bookId] === undefined) {
-    throw new ParseError(`Unknown book: "${raw.trim()}"`, "unknown_book");
-  }
-  return bookId;
+  throw new ParseError(`Unknown book: "${raw.trim()}"`, "unknown_book");
 }
 
 /* ------------------------------------------------------------------ *

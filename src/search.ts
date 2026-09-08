@@ -11,7 +11,18 @@
  */
 
 import { INDEX, WORD_COUNTS, TOKEN_COUNT, DOC_FREQUENCIES } from "./data/asv/search-index.ts";
-import { decodeDeltas, TOTAL_VERSES, verseAt, type CorpusVerse } from "./corpus.ts";
+import { decodeDeltas, totalVersesOf, verseAt, type CorpusVerse } from "./corpus.ts";
+
+/**
+ * Search is still built over a single edition. The inverted index, the
+ * word-length table and the BM25 corpus size below are all the ASV's, so a
+ * query answered for any other translation would return ASV verses under that
+ * translation's name -- the silent wrong answer this project refuses.
+ * src/index.ts declines such a request instead of serving it, and this constant
+ * is the reason it has to.
+ */
+const SEARCH_TRANSLATION = "asv";
+const SEARCH_CORPUS_SIZE = totalVersesOf(SEARCH_TRANSLATION);
 import { FAMILY_GROUPS } from "./data/asv/families.ts";
 import { tokenize } from "./tokenize.ts";
 
@@ -92,7 +103,7 @@ const POSTINGS_CACHE: (Int32Array | undefined)[] = new Array<Int32Array | undefi
   LINES.length,
 );
 
-const WORD_LENGTHS: Int32Array = decodeDeltas(WORD_COUNTS, TOTAL_VERSES);
+const WORD_LENGTHS: Int32Array = decodeDeltas(WORD_COUNTS, SEARCH_CORPUS_SIZE);
 
 /**
  * How many verses each token appears in.
@@ -362,7 +373,7 @@ export function search(query: string, limit: number, offset: number): SearchOutc
   const idfTotal = terms.reduce(
     (sum, term) =>
       sum +
-      Math.log(1 + (TOTAL_VERSES - term.documentFrequency + 0.5) / (term.documentFrequency + 0.5)),
+      Math.log(1 + (SEARCH_CORPUS_SIZE - term.documentFrequency + 0.5) / (term.documentFrequency + 0.5)),
     0,
   );
 

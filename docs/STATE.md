@@ -19,10 +19,12 @@ Git history is the record of what changed.
 
 ## What exists
 
-**A deployed API.** <https://colophon.hellobensmith.workers.dev> — the complete
-ASV 1901, 31,102 verses, embedded in a Cloudflare Worker with no database.
-Reference parsing, ranked search, three canon traditions, Hebrew and Greek psalm
-numbering, a demo page at `/`.
+**A deployed API serving two editions.**
+<https://colophon.hellobensmith.workers.dev> — the ASV 1901 (31,102 verses) and
+the Douay-Rheims (35,811 verses, 73 books), both embedded in a Cloudflare
+Worker with no database. Reference parsing, three canon traditions, Hebrew and
+Greek psalm numbering, a demo page at `/`. Search covers the ASV only, and
+returns 501 for anything else rather than answering from the wrong index.
 
 **A conformance suite.** `conformance/` — asks seven public Scripture APIs the
 same semantic questions and writes a capability matrix. Published for
@@ -38,8 +40,10 @@ to make it pass, which fails too.
 |---|---|
 | ASV verses | 31,102 |
 | ASV books | 66 |
+| DRA verses | 35,811 |
+| DRA books | 73 |
 | Books with metadata only | 10 |
-| Registered translations | asv |
+| Registered translations | asv, dra |
 | REVISION_ID | 365da92d6d9b… |
 | GENERATION_ID | 1f4166f15db9… |
 
@@ -146,16 +150,34 @@ measurement rather than assumed:
   and `versificationOf(id)` memoises the result lazily. `sequenceOf` and `locate`
   take a translation; ~~`BOOK_START`~~ / ~~`CHAPTER_OFFSET`~~ are gone as module
   globals.
-- **Next:** the *text* keyed by `(translation, book)`. `src/corpus.ts` still
-  imports one edition's `TEXT` statically, so `verseAt` returns ASV text whatever
-  translation was asked for. Registering a second edition before this lands would
-  serve DRA coordinates against ASV words. Needs a dispatch layer over both
-  editions' modules — and needs two editions present to design against, which is
-  why it waits on the DRA ingest rather than leading it.
-- `data_availability` per `(translation, book)`. The ASV reports **ten** books as
-  `metadata_only`: TOB, JDT, WIS, SIR, BAR, 1MA, 2MA, 1ES, 3MA, MAN. **Counted
-  8 September: the DRA supplies seven of them** — TOB, JDT, WIS, SIR, BAR, 1MA,
-  2MA — and not 1ES, 3MA or MAN. Asserted by `src/validate.test.ts`.
+- ~~The *text* keyed by `(translation, book)`~~ **done 8 September, and the
+  Douay-Rheims is being served.** `src/corpus.ts` holds both editions' modules
+  and derives each one's offset table on first use, not at module scope: cold
+  start is paid by whichever request an isolate serves first, and it should not
+  be charged for a text nobody asked for. `textAt`, `verseAt`,
+  `verseByReference`, `descriptiveTitle` and `subscription` all take a
+  translation.
+
+  Wiring it exposed exactly the failure the project exists to refuse. With the
+  coordinate layer per-translation and the corpus reads still defaulting,
+  `Esther 14:1` in the Douay-Rheims returned **`JOB.3.5`** — a real verse, from
+  the wrong book, under a reference that looked fine. Resolving with one
+  edition's versification and reading another's text is not a near miss; it is
+  the silent wrong answer, and it took registering a second edition to make it
+  visible.
+
+  The eight books with identical totals and different chapter shapes — NUM, JOS,
+  JDG, JOB, ECC, ISA, JON, HAG — are asserted end to end in
+  `src/editions.test.ts`: same reference, both editions, different words.
+- ~~`data_availability` per `(translation, book)`~~ **done 8 September.** The ASV
+  reports ten books as `metadata_only`: TOB, JDT, WIS, SIR, BAR, 1MA, 2MA, 1ES,
+  3MA, MAN. The DRA supplies seven of them — not 1ES, 3MA or MAN.
+
+  `dataAvailability` in `src/canon.ts` is derived globally (every
+  deuterocanonical book is `metadata_only`), so `ensureAvailable` consulting it
+  first refused Tobit for an edition that prints fourteen chapters of it. The
+  edition's own verse counts are the authority now; the canon metadata only
+  explains why something is absent.
 - ~~The Douay-Rheims is ingested~~ **done 8 September.** `bun run build:data
   --translation dra` passes every assertion and emits `src/data/dra/`: 35,811
   verses, 73 books, 1,334 chapters. Its revision id is the archive sha256

@@ -1,15 +1,24 @@
 /**
- * Runtime view over the embedded corpus.
+ * Runtime view over the embedded corpora.
  *
- * Every table is built once at module scope. Cloudflare charges global-scope
- * evaluation against a one-second startup budget that is separate from the
- * per-request CPU limit, so doing this work eagerly here keeps requests cheap
- * rather than making the first request in an isolate pay for it.
+ * Each edition's tables are built once and kept, but **not eagerly**. Cloudflare
+ * charges global-scope evaluation against a one-second startup budget separate
+ * from the per-request CPU limit, and that budget is paid by whichever request
+ * an isolate happens to serve first. Building every registered edition's offset
+ * table at module scope would charge that request for texts it did not ask for,
+ * so the work happens on first use per edition — the same reasoning, and the
+ * same shape, as `versificationOf` in `src/translations.ts`.
+ *
+ * The verse text itself is still a module-scope string constant in each
+ * generated module; only the derived tables are deferred.
  */
 
-import { TEXT, LENGTHS, VERSE_COUNT } from "./data/asv/text.ts";
-import { TITLES, SUBSCRIPTIONS, NOTES } from "./data/asv/meta.ts";
+import * as asvText from "./data/asv/text.ts";
+import * as asvMeta from "./data/asv/meta.ts";
+import * as draText from "./data/dra/text.ts";
+import * as draMeta from "./data/dra/meta.ts";
 import { locate, sequenceOf } from "./parser.ts";
+import { DEFAULT_TRANSLATION, UnknownTranslationError } from "./translations.ts";
 
 /** Decodes a base36 delta list into absolute values. */
 export function decodeDeltas(encoded: string, expected: number): Int32Array {
@@ -26,20 +35,100 @@ export function decodeDeltas(encoded: string, expected: number): Int32Array {
   return values;
 }
 
-/** Cumulative character offsets: verse n occupies [OFFSETS[n-1], OFFSETS[n]). */
-const OFFSETS: Int32Array = (() => {
-  const lengths = decodeDeltas(LENGTHS, VERSE_COUNT);
-  const offsets = new Int32Array(VERSE_COUNT + 1);
+/** The generated modules for one edition, before any table is derived. */
+interface EditionModules {
+  readonly text: string;
+  readonly lengths: string;
+  readonly verseCount: number;
+  readonly titles: Readonly<Record<string, string>>;
+  readonly subscriptions: Readonly<Record<string, string>>;
+  readonly notes: Readonly<Record<string, string>>;
+  readonly revisionId: string;
+  readonly generationId: string;
+  readonly editionId: string;
+}
+
+/**
+ * Statically imported, because a Worker bundle has no loader: every edition it
+ * can serve has to be present at build time. Registering an edition in
+ * `src/translations.ts` without adding it here would resolve coordinates
+ * correctly and then read another edition's words.
+ */
+const MODULES: Readonly<Record<string, EditionModules>> = {
+  asv: {
+    text: asvText.TEXT,
+    lengths: asvText.LENGTHS,
+    verseCount: asvText.VERSE_COUNT,
+    titles: asvMeta.TITLES,
+    subscriptions: asvMeta.SUBSCRIPTIONS,
+    notes: asvMeta.NOTES,
+    revisionId: asvMeta.REVISION_ID,
+    generationId: asvMeta.GENERATION_ID,
+    editionId: asvMeta.EDITION_ID,
+  },
+  dra: {
+    text: draText.TEXT,
+    lengths: draText.LENGTHS,
+    verseCount: draText.VERSE_COUNT,
+    titles: draMeta.TITLES,
+    subscriptions: draMeta.SUBSCRIPTIONS,
+    notes: draMeta.NOTES,
+    revisionId: draMeta.REVISION_ID,
+    generationId: draMeta.GENERATION_ID,
+    editionId: draMeta.EDITION_ID,
+  },
+};
+
+interface Corpus extends EditionModules {
+  /** Cumulative offsets: verse n occupies [offsets[n-1], offsets[n]). */
+  readonly offsets: Int32Array;
+}
+
+const BUILT = new Map<string, Corpus>();
+
+function corpusFor(translation: string = DEFAULT_TRANSLATION): Corpus {
+  const cached = BUILT.get(translation);
+  if (cached !== undefined) return cached;
+
+  const modules = MODULES[translation];
+  if (modules === undefined) {
+    throw new UnknownTranslationError(translation);
+  }
+
+  const lengths = decodeDeltas(modules.lengths, modules.verseCount);
+  const offsets = new Int32Array(modules.verseCount + 1);
   let cursor = 0;
-  for (let index = 0; index < VERSE_COUNT; index += 1) {
+  for (let index = 0; index < modules.verseCount; index += 1) {
     offsets[index] = cursor;
     cursor += lengths[index]!;
   }
-  offsets[VERSE_COUNT] = cursor;
-  return offsets;
-})();
+  offsets[modules.verseCount] = cursor;
 
-export const TOTAL_VERSES = VERSE_COUNT;
+  const built: Corpus = { ...modules, offsets };
+  BUILT.set(translation, built);
+  return built;
+}
+
+/** Which editions have text embedded, as opposed to merely being registered. */
+export const EMBEDDED_TRANSLATIONS: readonly string[] = Object.keys(MODULES);
+
+export function totalVersesOf(translation: string = DEFAULT_TRANSLATION): number {
+  return corpusFor(translation).verseCount;
+}
+
+/** What this edition is and what was published, for identity headers. */
+export function identityOf(translation: string = DEFAULT_TRANSLATION): {
+  readonly editionId: string;
+  readonly revisionId: string;
+  readonly generationId: string;
+} {
+  const corpus = corpusFor(translation);
+  return {
+    editionId: corpus.editionId,
+    revisionId: corpus.revisionId,
+    generationId: corpus.generationId,
+  };
+}
 
 export interface CorpusVerse {
   readonly id: string;
@@ -52,15 +141,20 @@ export interface CorpusVerse {
 }
 
 /** Verse text by global sequence, without materializing any intermediate array. */
-export function textAt(sequence: number): string {
-  if (sequence < 1 || sequence > VERSE_COUNT) {
+export function textAt(sequence: number, translation: string = DEFAULT_TRANSLATION): string {
+  const corpus = corpusFor(translation);
+  if (sequence < 1 || sequence > corpus.verseCount) {
     throw new RangeError(`Verse sequence out of range: ${sequence}`);
   }
-  return TEXT.slice(OFFSETS[sequence - 1]!, OFFSETS[sequence]!);
+  return corpus.text.slice(corpus.offsets[sequence - 1]!, corpus.offsets[sequence]!);
 }
 
-export function verseAt(sequence: number): CorpusVerse {
-  const { book, chapter, verse } = locate(sequence);
+export function verseAt(
+  sequence: number,
+  translation: string = DEFAULT_TRANSLATION,
+): CorpusVerse {
+  const corpus = corpusFor(translation);
+  const { book, chapter, verse } = locate(sequence, translation);
   const id = `${book}.${chapter}.${verse}`;
   return {
     id,
@@ -68,24 +162,37 @@ export function verseAt(sequence: number): CorpusVerse {
     chapter,
     verse,
     sequence,
-    text: textAt(sequence),
-    note: NOTES[id] ?? null,
+    text: textAt(sequence, translation),
+    note: corpus.notes[id] ?? null,
   };
 }
 
-export function verseByReference(book: string, chapter: number, verse: number): CorpusVerse {
-  return verseAt(sequenceOf(book, chapter, verse));
+export function verseByReference(
+  book: string,
+  chapter: number,
+  verse: number,
+  translation: string = DEFAULT_TRANSLATION,
+): CorpusVerse {
+  return verseAt(sequenceOf(book, chapter, verse, translation), translation);
 }
 
 /** The superscription printed above a chapter, if it has one. */
-export function descriptiveTitle(book: string, chapter: number): string | null {
-  return TITLES[`${book}.${chapter}`] ?? null;
+export function descriptiveTitle(
+  book: string,
+  chapter: number,
+  translation: string = DEFAULT_TRANSLATION,
+): string | null {
+  return corpusFor(translation).titles[`${book}.${chapter}`] ?? null;
 }
 
 /**
  * The line printed below a chapter's last verse, if it has one. Only Habakkuk 3
- * has one in the ASV.
+ * has one in the ASV; the Douay-Rheims has none at all.
  */
-export function subscription(book: string, chapter: number): string | null {
-  return SUBSCRIPTIONS[`${book}.${chapter}`] ?? null;
+export function subscription(
+  book: string,
+  chapter: number,
+  translation: string = DEFAULT_TRANSLATION,
+): string | null {
+  return corpusFor(translation).subscriptions[`${book}.${chapter}`] ?? null;
 }

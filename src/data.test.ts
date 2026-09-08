@@ -8,13 +8,15 @@ import {
 } from "./expectations/asv.ts";
 import { VERSE_COUNTS, TITLES, SUBSCRIPTIONS, NOTES, TITLED_PSALMS } from "./data/asv/meta.ts";
 import {
-  TOTAL_VERSES,
+  totalVersesOf,
   textAt,
   verseAt,
   verseByReference,
   descriptiveTitle,
   subscription,
 } from "./corpus.ts";
+
+const TOTAL_VERSES = totalVersesOf("asv");
 import { sequenceOf, locate } from "./parser.ts";
 import { search } from "./search.ts";
 import { PROTESTANT_ORDER } from "./canon.ts";

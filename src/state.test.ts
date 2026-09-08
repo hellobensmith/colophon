@@ -22,12 +22,14 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { BOOKS } from "./canon.ts";
-import { TOTAL_VERSES } from "./corpus.ts";
+import { totalVersesOf } from "./corpus.ts";
 import { versificationOf, TRANSLATION_IDS, DEFAULT_TRANSLATION } from "./translations.ts";
 import { REVISION_ID, GENERATION_ID } from "./data/asv/meta.ts";
 import { chapterCount } from "./parser.ts";
 import { verseAt } from "./corpus.ts";
 import { greekVerseCount, numberedVerses } from "./psalms.ts";
+
+const TOTAL_VERSES = totalVersesOf("asv");
 
 const STATE = await Bun.file(
   new URL("../docs/STATE.md", import.meta.url),
@@ -57,6 +59,14 @@ function claimed(fact: string): string {
 describe("docs/STATE.md matches the code it describes", () => {
   test("ASV verse count", () => {
     expect(claimed("ASV verses")).toBe(TOTAL_VERSES.toLocaleString("en-US"));
+  });
+
+  test("DRA verse count", () => {
+    expect(claimed("DRA verses")).toBe(totalVersesOf("dra").toLocaleString("en-US"));
+  });
+
+  test("DRA book count", () => {
+    expect(claimed("DRA books")).toBe(String(versificationOf("dra").order.length));
   });
 
   test("ASV book count", () => {

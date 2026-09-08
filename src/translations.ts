@@ -27,8 +27,9 @@
  * parser.
  */
 
-import { PROTESTANT_ORDER } from "./canon.ts";
-import { VERSE_COUNTS } from "./data/asv/meta.ts";
+import { EDITION_ORDER } from "./canon.ts";
+import { VERSE_COUNTS as ASV_VERSE_COUNTS } from "./data/asv/meta.ts";
+import { VERSE_COUNTS as DRA_VERSE_COUNTS } from "./data/dra/meta.ts";
 import { buildVersification, type Versification } from "./versification.ts";
 
 export const DEFAULT_TRANSLATION = "asv";
@@ -78,15 +79,36 @@ const ASV: Translation = {
     format: "USFX",
   },
   editionId: "asv",
-  verseCounts: VERSE_COUNTS,
-  order: PROTESTANT_ORDER,
+  verseCounts: ASV_VERSE_COUNTS,
+  order: EDITION_ORDER.asv,
+};
+
+const DRA: Translation = {
+  meta: {
+    id: "dra",
+    name: "Douay-Rheims American Edition",
+    language: "en",
+    license: "Public Domain",
+    year: 1899,
+  },
+  source: {
+    name: "eBible.org",
+    url: "https://ebible.org/Scriptures/engDRA_usfx.zip",
+    format: "USFX",
+  },
+  editionId: "dra",
+  verseCounts: DRA_VERSE_COUNTS,
+  order: EDITION_ORDER.dra,
 };
 
 /**
  * Registered in the order they should be offered. The ASV is first because it
  * is the default, not because it is privileged.
  */
-export const TRANSLATIONS: ReadonlyMap<string, Translation> = new Map([[ASV.meta.id, ASV]]);
+export const TRANSLATIONS: ReadonlyMap<string, Translation> = new Map([
+  [ASV.meta.id, ASV],
+  [DRA.meta.id, DRA],
+]);
 
 export const TRANSLATION_IDS: readonly string[] = [...TRANSLATIONS.keys()];
 
