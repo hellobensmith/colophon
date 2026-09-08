@@ -1,6 +1,6 @@
 # State — read this first
 
-Last updated 7 September 2026 · public repo · working tree clean · deployed
+Last updated 8 September 2026 · public repo · deployed
 
 This file exists so a new session does not have to re-derive anything. Everything
 below was measured or verified; nothing here is recalled.
@@ -20,14 +20,14 @@ transparency, not criticism.
 
 | | |
 |---|---|
-| Tests | 186 across 12 files |
+| Tests | 214 across 14 files |
 | Contract | 54/54 responses conform to `openapi.yaml` |
 | Bundle | 1,940 KiB gzip against a 10 MB limit (paid plan; the 3 MB figure is free-tier) |
 | Production CPU | median 3-18 ms, worst 21-48 ms across six runs; the worst tracks cold isolates, not the code. No CPU cap enforced. |
 | Repo | `github.com/hellobensmith/colophon`, **public** |
 
 ```bash
-bun test                    # 186 tests, no network
+bun test                    # 214 tests, no network
 bun run typecheck           # tsc, strict
 bun run build:data          # re-ingest; refuses to emit on any failed assertion
 bun run dev                 # wrangler dev on :8787
@@ -104,8 +104,11 @@ measurement rather than assumed:
   `sequenceOf` and `locate` all become per-translation. There is no shared
   skeleton. The registry deliberately holds no verse counts yet — carrying them
   for one translation and not the other is worse than carrying them for neither.
-- `data_availability` per `(translation, book)` — the DRA supplies exactly the
-  seven books the ASV reports as `metadata_only`.
+- `data_availability` per `(translation, book)`. The ASV reports **ten** books as
+  `metadata_only`: TOB, JDT, WIS, SIR, BAR, 1MA, 2MA, 1ES, 3MA, MAN. How many of
+  them the DRA supplies is unverified — an earlier note here claimed seven, which
+  does not match `src/canon.ts`. Count them against the archive before relying on
+  it.
 - Ingest must tolerate a source with **no `<d>` titles and no footnotes**. The
   ASV path assumes both exist.
 - `build:data` and `validate.ts` currently hard-code the ASV source URL and its
@@ -338,11 +341,50 @@ matched exactly (185,600 bytes). 198 tests, `tsc` clean, `src/data/` untouched
 so neither identifier moved. 31,102 `locate`+`sequenceOf` round trips cost
 17 ms — 0.55 µs each.
 
-Still ASV-only and still to do: `src/psalms.ts`, `src/data.test.ts` and
-`scripts/build-data.ts` reach for `VERSE_COUNTS` directly, `src/validate.ts`
-keeps per-book assertions, and the translation is not yet threaded through
-`parseReference` into `ensureAvailable` — the parameter is there, nothing passes
-it. That threading is the next step, and it is small.
+**The translation is threaded through the read path — done 8 September 2026.**
+
+`parseReference` takes a `translation` option and forwards it through
+`resolveBook` → `ensureAvailable`, `validateChapter`, `validateVerse` and every
+`sequenceOf` call. All four read handlers in `src/index.ts` pass the id they had
+already resolved.
+
+Two of them were not resolving one at all. `/books/:id` and
+`/books/:id/chapters/:num` ignored `?translation=` and answered from the ASV
+under HTTP 200 — the silent wrong answer the conformance suite records against
+other APIs, in our own code. Both now 404 an unknown id like `/books` and
+`/passages` already did. **This is the one intentional behaviour change**;
+everything else is byte-identical across 50 captured responses.
+
+`src/threading.test.ts` proves the parameter is consumed rather than accepted
+and dropped, which byte-identity cannot: with everything defaulting to the ASV,
+identical output is guaranteed by construction. Each assertion was checked by
+deliberately breaking the threading and confirming it fails. One earlier version
+of the `resolveBook` test survived that check — asserting `parseReference` throws
+for a bogus translation proves nothing, because `chapterCount` throws a moment
+later regardless. A metadata-only book discriminates: `ensureAvailable` throws
+there before `chapterCount` runs, with a different error type.
+
+Still ASV-only: `src/psalms.ts`, `src/data.test.ts` and `scripts/build-data.ts`
+reach for `VERSE_COUNTS` directly, and `src/validate.ts` keeps per-book
+assertions.
+
+`src/psalms.ts` was deliberately left alone. It holds no verse-count table; it
+encodes a tradition — `fromHebrew` maps "to its position in the ASV's English
+text", and `irregularGreekParts` hardcodes the Septuagint mapping (Greek 9 =
+Hebrew 9+10, Greek 113 = Hebrew 114+115). A `translation` parameter there would
+be accepted and then ignored by the logic underneath. For the DRA the premise
+inverts, since Greek numbering is native and `fromGreek` becomes identity. That
+module needs the DRA in hand to design against.
+
+`dataAvailability` is a known half-measure: `ensureAvailable` now names the
+edition from the registry, but the fact it reports comes from `src/canon.ts`,
+where it is derived globally (`isDeuterocanon ? "metadata_only" : "full"`). The
+message can therefore name an edition while stating the ASV's availability.
+Closes when `data_availability` becomes per `(translation, book)`.
+
+**Corrected above:** the per-translation `data_availability` note claimed the ASV
+reports seven `metadata_only` books. It reports ten. Counted from
+`src/canon.ts`, not from prose.
 
 Then `build:data` and `validate.ts` need to run per translation — both currently
 hard-code the ASV source URL — and the DRA data can be generated. Its archive is

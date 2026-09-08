@@ -33,7 +33,11 @@ import {
 } from "./corpus.ts";
 import { search, countQueryTerms, MAX_QUERY_TERMS } from "./search.ts";
 import { DEMO_HTML } from "./demo.ts";
-import { resolveTranslation, UnknownTranslationError } from "./translations.ts";
+import {
+  DEFAULT_TRANSLATION,
+  resolveTranslation,
+  UnknownTranslationError,
+} from "./translations.ts";
 import { TITLED_PSALMS, REVISION_ID, GENERATION_ID, EDITION_ID } from "./data/meta.ts";
 
 /** Longest passage served in one response. */
@@ -169,7 +173,7 @@ function hebrewNumbering(verse: CorpusVerse): number {
     : verse.verse;
 }
 
-function serializeBook(bookId: string) {
+function serializeBook(bookId: string, translation: string = DEFAULT_TRANSLATION) {
   const meta = BOOKS.get(bookId);
   if (meta === undefined) throw notFound(`No book with id "${bookId}"`);
   return {
@@ -177,7 +181,7 @@ function serializeBook(bookId: string) {
     name: meta.name,
     testament: meta.testament,
     is_deuterocanon: meta.isDeuterocanon,
-    chapters_count: chapterCount(meta.id),
+    chapters_count: chapterCount(meta.id, translation),
     author: meta.author,
     genre: meta.genre,
     approximate_date: meta.approximateDate,
@@ -244,24 +248,26 @@ app.get("/books", (context) => {
   return context.json({
     tradition,
     translation: translation.meta,
-    books: CANON_ORDER[tradition].map((bookId) => serializeBook(bookId)),
+    books: CANON_ORDER[tradition].map((bookId) => serializeBook(bookId, translation.meta.id)),
   });
 });
 
 app.get("/books/:id", (context) => {
+  const translation = translationOf(context);
   const id = context.req.param("id").toUpperCase();
   if (!BOOKS.has(id)) throw notFound(`No book with id "${context.req.param("id")}"`);
   context.header("Cache-Control", DAILY);
-  return context.json(serializeBook(id));
+  return context.json(serializeBook(id, translation.meta.id));
 });
 
 app.get("/books/:id/chapters/:num", (context) => {
+  const translation = translationOf(context);
   const id = context.req.param("id").toUpperCase();
   const meta = BOOKS.get(id);
   if (meta === undefined) throw notFound(`No book with id "${context.req.param("id")}"`);
   if (meta.dataAvailability === "metadata_only") {
     throw notFound(
-      `${meta.name} is not present in the American Standard Version; only its canon metadata is available`,
+      `${meta.name} is not present in the ${translation.meta.name}; only its canon metadata is available`,
     );
   }
 
@@ -270,13 +276,13 @@ app.get("/books/:id/chapters/:num", (context) => {
     throw new HttpError(400, "bad_request", `Chapter must be a number, got "${raw}"`);
   }
   const chapter = Number.parseInt(raw, 10);
-  const total = chapterCount(id);
+  const total = chapterCount(id, translation.meta.id);
   if (chapter < 1 || chapter > total) {
     throw notFound(`${meta.name} has ${total} chapter${total === 1 ? "" : "s"}, so there is no chapter ${chapter}`);
   }
 
   const verses = [];
-  const count = verseCount(id, chapter);
+  const count = verseCount(id, chapter, translation.meta.id);
   for (let number = 1; number <= count; number += 1) {
     const verse = verseByReference(id, chapter, number);
     verses.push({
@@ -326,7 +332,10 @@ app.get("/passages", (context) => {
     );
   }
 
-  const parsed = parseReference(reference, { numbering: numberingParam });
+  const parsed = parseReference(reference, {
+    numbering: numberingParam,
+    translation: translation.meta.id,
+  });
 
   if (parsed.verseCount > MAX_PASSAGE_VERSES) {
     throw new HttpError(

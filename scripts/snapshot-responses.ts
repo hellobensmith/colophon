@@ -65,6 +65,20 @@ const PATHS = [
   // translation plumbing
   "/books?translation=nope",
   "/passages?ref=John+1:1&translation=asv",
+
+  // every site where a handler resolves a translation and then asks the
+  // parser for coordinates — explicit ?translation=asv must match the default
+  "/books?translation=asv",
+  "/books/GEN?translation=asv",
+  "/books/PSA?translation=asv",
+  "/books/GEN/chapters/1?translation=asv",
+  "/books/PSA/chapters/119?translation=asv",
+  "/passages?ref=Genesis+1:1&translation=asv",
+  "/passages?ref=Revelation+22:21&translation=asv",
+  "/passages?ref=Genesis+1:29-2:3&translation=asv",
+  "/passages?ref=Genesis+1:32&translation=asv",
+  "/passages?ref=Psalm+23:1&numbering=hebrew&translation=asv",
+  "/passages?ref=Psalm+23:1&numbering=greek&translation=asv",
 ];
 
 /**

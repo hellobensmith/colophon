@@ -210,12 +210,12 @@ function displayName(bookId: string): string {
   return BOOKS.get(bookId)?.name ?? bookId;
 }
 
-function resolveBook(raw: string): string {
+function resolveBook(raw: string, translation: string = DEFAULT_TRANSLATION): string {
   const name = normalizeBookName(raw);
   if (name === "") throw new ParseError("No book name was given");
 
   const exact = NORMALIZED_NAMES.get(name) ?? ALIASES.get(name);
-  if (exact !== undefined) return ensureAvailable(exact, raw);
+  if (exact !== undefined) return ensureAvailable(exact, raw, translation);
 
   const candidates = new Set<string>();
   for (const [candidateName, id] of NORMALIZED_NAMES) {
@@ -227,7 +227,7 @@ function resolveBook(raw: string): string {
 
   if (candidates.size === 1) {
     const [only] = candidates;
-    return ensureAvailable(only as string, raw);
+    return ensureAvailable(only as string, raw, translation);
   }
   if (candidates.size === 0) {
     throw new ParseError(`Unknown book: "${raw.trim()}"`, "unknown_book");
@@ -416,9 +416,18 @@ function psalmVerseCount(numbering: Numbering, psalm: number): number {
 
 export function parseReference(
   input: string,
-  options: { readonly numbering?: Numbering } = {},
+  options: {
+    readonly numbering?: Numbering;
+    /**
+     * Which edition's versification to resolve against. A coordinate is only
+     * meaningful paired with an edition; the default keeps existing callers
+     * on the ASV.
+     */
+    readonly translation?: string;
+  } = {},
 ): ParsedReference {
   const numbering: Numbering = options.numbering ?? "english";
+  const translation: string = options.translation ?? DEFAULT_TRANSLATION;
 
   if (typeof input !== "string" || input.trim() === "") {
     throw new ParseError("A reference is required, for example \"John 3:16\"");
@@ -439,7 +448,7 @@ export function parseReference(
     }
   }
 
-  const book = resolveBook(bookPart);
+  const book = resolveBook(bookPart, translation);
 
   if (numbering !== "english" && book !== "PSA") {
     const scheme = numbering === "greek" ? "Greek" : "Hebrew";
@@ -449,7 +458,7 @@ export function parseReference(
     );
   }
 
-  const chapters = chapterCount(book);
+  const chapters = chapterCount(book, translation);
   const singleChapterBook = chapters === 1;
 
   // A bare book name means the whole book.
@@ -465,8 +474,8 @@ export function parseReference(
   for (const raw of rawSegments) {
     const startChapter = raw.startChapter ?? 1;
     const endChapter = raw.endChapter ?? startChapter;
-    validateChapter(book, startChapter);
-    validateChapter(book, endChapter);
+    validateChapter(book, startChapter, translation);
+    validateChapter(book, endChapter, translation);
 
 
     let startVerse: number;
@@ -499,13 +508,13 @@ export function parseReference(
         book,
         chapter: startPsalm,
         verse: startEnglishVerse,
-        sequence: sequenceOf(book, startPsalm, startEnglishVerse),
+        sequence: sequenceOf(book, startPsalm, startEnglishVerse, translation),
       };
       const endRef: VerseRef = {
         book,
         chapter: end.psalm,
         verse: end.verse,
-        sequence: sequenceOf(book, end.psalm, end.verse),
+        sequence: sequenceOf(book, end.psalm, end.verse, translation),
       };
       if (endRef.sequence < startRef.sequence) {
         throw new ParseError(
@@ -520,22 +529,22 @@ export function parseReference(
 
     {
       startVerse = raw.startVerse ?? 1;
-      endVerse = raw.endVerse ?? verseCount(book, endChapter);
-      validateVerse(book, startChapter, startVerse);
-      validateVerse(book, endChapter, endVerse);
+      endVerse = raw.endVerse ?? verseCount(book, endChapter, translation);
+      validateVerse(book, startChapter, startVerse, translation);
+      validateVerse(book, endChapter, endVerse, translation);
     }
 
     const start: VerseRef = {
       book,
       chapter: startChapter,
       verse: startVerse,
-      sequence: sequenceOf(book, startChapter, startVerse),
+      sequence: sequenceOf(book, startChapter, startVerse, translation),
     };
     const end: VerseRef = {
       book,
       chapter: endChapter,
       verse: endVerse,
-      sequence: sequenceOf(book, endChapter, endVerse),
+      sequence: sequenceOf(book, endChapter, endVerse, translation),
     };
     if (end.sequence < start.sequence) {
       throw new ParseError(
@@ -565,8 +574,12 @@ export function parseReference(
   };
 }
 
-function validateChapter(book: string, chapter: number): void {
-  const total = chapterCount(book);
+function validateChapter(
+  book: string,
+  chapter: number,
+  translation: string = DEFAULT_TRANSLATION,
+): void {
+  const total = chapterCount(book, translation);
   if (chapter < 1 || chapter > total) {
     throw new ParseError(
       `${displayName(book)} has ${total} chapter${total === 1 ? "" : "s"}, so there is no chapter ${chapter}`,
@@ -575,8 +588,13 @@ function validateChapter(book: string, chapter: number): void {
   }
 }
 
-function validateVerse(book: string, chapter: number, verse: number): void {
-  const total = verseCount(book, chapter);
+function validateVerse(
+  book: string,
+  chapter: number,
+  verse: number,
+  translation: string = DEFAULT_TRANSLATION,
+): void {
+  const total = verseCount(book, chapter, translation);
   if (verse < 1 || verse > total) {
     throw new ParseError(
       `${displayName(book)} ${chapter} only has ${total} verses`,
