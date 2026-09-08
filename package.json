@@ -11,7 +11,8 @@
     "test": "bun test",
     "check:contract": "bun scripts/check-contract.ts",
     "check:platform": "bun scripts/check-platform.ts",
-    "conformance": "bun conformance/run.ts"
+    "conformance": "bun conformance/run.ts",
+    "build:openapi": "bun scripts/embed-openapi.ts"
   },
   "dependencies": {
     "hono": "4.13.5"

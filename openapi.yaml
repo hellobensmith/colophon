@@ -3,13 +3,23 @@ info:
   title: Colophon
   version: 1.0.0
   description: |
-    The complete American Standard Version (1901), public domain, served from
-    Cloudflare Workers. The corpus is embedded in the Worker, so no request
-    performs any I/O.
+    Two public-domain editions, served from Cloudflare Workers: the American
+    Standard Version (1901) and the Douay-Rheims. Both corpora are embedded in
+    the Worker, so no request performs any I/O.
+
+    Every response names the translation it came from, and carries the edition,
+    revision and generation identifiers of that text. Pass ?translation= to
+    choose; an unknown id is refused rather than silently answered from the
+    default.
+
+    Versification belongs to the edition, not to the canon. Of the 66 books the
+    two share, 32 are numbered differently — so a verse coordinate is only
+    meaningful paired with a translation.
 
     Canon awareness: every book carries its position in the Protestant (66),
     Catholic (73), and Orthodox Greek (76) canons. The ASV contains no
-    deuterocanonical text, so those books are present as metadata only.
+    deuterocanonical text, so those books are metadata only there; the
+    Douay-Rheims supplies seven of them.
   license:
     name: Public Domain
     url: https://ebible.org/asv/
@@ -323,6 +333,14 @@ paths:
           in: query
           schema: { type: integer, minimum: 0, default: 0 }
       responses:
+        "501":
+          description: |
+            The full-text index covers the ASV only. Rather than answer from it
+            while labelling the response with another translation, this route
+            declines and names what it does cover.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "200":
           description: Ranked matches, best first.
           content:
@@ -378,7 +396,7 @@ components:
       required: [id, name, language, license, year]
       additionalProperties: false
       properties:
-        id: { type: string, enum: [asv] }
+        id: { type: string, enum: [asv, dra] }
         name: { type: string }
         language: { type: string }
         license: { type: string }

@@ -40,6 +40,7 @@ import {
   UnknownTranslationError,
 } from "./translations.ts";
 import { TITLED_PSALMS } from "./data/asv/meta.ts";
+import { OPENAPI } from "./openapi.ts";
 
 /**
  * The one edition the inverted index covers. Everything else this deployment
@@ -221,6 +222,19 @@ function serializePassageVerse(verse: CorpusVerse) {
 app.get("/", (context) => {
   context.header("Cache-Control", "public, max-age=300");
   return context.html(DEMO_HTML);
+});
+
+/**
+ * The contract, served next to the thing it describes.
+ *
+ * A spec a caller cannot fetch is a spec that quietly goes stale; this one is
+ * bundled with the Worker, so the running code and its published description
+ * ship together.
+ */
+app.get("/openapi.yaml", (context) => {
+  context.header("Content-Type", "application/yaml; charset=utf-8");
+  context.header("Cache-Control", DAILY);
+  return context.body(OPENAPI);
 });
 
 app.get("/health", (context) => {

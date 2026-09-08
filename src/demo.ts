@@ -26,8 +26,8 @@ export const DEMO_HTML = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Colophon — American Standard Version</title>
-<meta name="description" content="The complete American Standard Version (1901) as a REST API: reference parsing, ranked search, and three canon traditions.">
+<title>Colophon — a Scripture API that tells you which text you hold</title>
+<meta name="description" content="Two complete public-domain Bibles as one REST API: the American Standard Version and the Douay-Rheims. Reference parsing, three canon traditions, and an edition identifier on every response.">
 <link rel="icon" href="${FAVICON}">
 <style>
 @layer reset, base, layout, components;
@@ -291,13 +291,14 @@ export const DEMO_HTML = `<!doctype html>
 
 <header class="masthead">
   <div class="shell stack">
-    <p class="eyebrow">Public domain &middot; American Standard Version, 1901</p>
+    <p class="eyebrow">Public domain &middot; American Standard Version 1901 &middot; Douay-Rheims</p>
     <h1>Colophon</h1>
     <p class="lede">
-      A Scripture API with no key, no account and no gatekeeper. All 31,102 verses
-      of the ASV compiled into a Cloudflare Worker, so a request performs no I/O.
-      A colophon is the note at the end of a manuscript saying who made it and
-      from what &mdash; every response here tells you exactly which text you hold.
+      A Scripture API with no key, no account and no gatekeeper. Two complete
+      Bibles &mdash; 66,913 verses &mdash; compiled into a Cloudflare Worker, so a
+      request performs no I/O. A colophon is the note at the end of a manuscript
+      saying who made it and from what: every response here tells you exactly
+      which text you hold, down to the revision it was built from.
     </p>
     <p class="status" id="status" data-state="checking">Checking the API&hellip;</p>
     <dl class="facts">
@@ -450,8 +451,11 @@ export const DEMO_HTML = `<!doctype html>
 <footer class="site-footer">
   <div class="shell stack" style="--flow-space: var(--space-3)">
     <p class="prose">
-      Text from <a href="https://ebible.org/Scriptures/eng-asv_usfx.zip">ebible.org</a>,
-      the USFX edition of the American Standard Version (1901). Public domain.
+      Text from <a href="https://ebible.org/">ebible.org</a>: the USFX editions of
+      the American Standard Version (1901) and the Douay-Rheims. Both public
+      domain. The two disagree about how 32 of the 66 books they share are
+      numbered, which is why a verse coordinate here is only meaningful paired
+      with a translation.
     </p>
     <p class="prose">
       The divine name is preserved as the ASV printed it: Jehovah, 6,887 times.
