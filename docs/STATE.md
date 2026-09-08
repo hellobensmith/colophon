@@ -5,6 +5,14 @@ Last updated 8 September 2026 · public repo · deployed
 This file exists so a new session does not have to re-derive anything. Everything
 below was measured or verified; nothing here is recalled.
 
+**Keeping it honest.** The facts in "Checked facts" are asserted by
+`src/state.test.ts`, so drift fails `bun test`. Everything else is prose and
+rots silently — this file has claimed 186 tests while the suite ran 214, and
+seven deuterocanonical books where `canon.ts` says ten. When something here is
+wrong, **correct the sentence in place**. Do not append an erratum: it leaves the
+false claim in the file and makes this longer, and the test rejects the pattern.
+Git history is the record of what changed.
+
 ---
 
 ## What exists
@@ -18,16 +26,39 @@ numbering, a demo page at `/`.
 same semantic questions and writes a capability matrix. Published for
 transparency, not criticism.
 
-| | |
+### Checked facts
+
+`src/state.test.ts` asserts every row below against the code. If one drifts the
+suite goes red, so **correct this table, not the test** — and never delete a row
+to make it pass, which fails too.
+
+| Fact | Value |
 |---|---|
-| Tests | 214 across 14 files |
-| Contract | 54/54 responses conform to `openapi.yaml` |
-| Bundle | 1,940 KiB gzip against a 10 MB limit (paid plan; the 3 MB figure is free-tier) |
-| Production CPU | median 3-18 ms, worst 21-48 ms across six runs; the worst tracks cold isolates, not the code. No CPU cap enforced. |
-| Repo | `github.com/hellobensmith/colophon`, **public** |
+| ASV verses | 31,102 |
+| ASV books | 66 |
+| Books with metadata only | 10 |
+| Registered translations | asv |
+| REVISION_ID | 365da92d6d9b… |
+| GENERATION_ID | 1f4166f15db9… |
+
+The test count is deliberately absent. It changed on nearly every commit, went
+stale as "186" while the suite ran 214, and tells a new session nothing that
+running `bun test` would not.
+
+### Measured, not checked
+
+These need a build, a server or the network, so they are snapshots. Each names
+the command that refreshes it; re-run before relying on one.
+
+| Measurement | Value | Refresh with |
+|---|---|---|
+| Contract | 54/54 responses conform to `openapi.yaml` | `bun run check:contract` |
+| Bundle | 1,941 KiB gzip against a 10 MB limit (paid plan; 3 MB is free-tier) | `bun run deploy` output, or `check:platform --probe-limit` |
+| Production CPU | median 3-18 ms, worst 21-48 ms over six runs; the worst tracks cold isolates, not the code. No CPU cap enforced. | `bun run check:platform` |
+| Repo | `github.com/hellobensmith/colophon`, **public** | — |
 
 ```bash
-bun test                    # 214 tests, no network
+bun test                    # no network; includes the STATE.md checks above
 bun run typecheck           # tsc, strict
 bun run build:data          # re-ingest; refuses to emit on any failed assertion
 bun run dev                 # wrangler dev on :8787
@@ -96,19 +127,20 @@ The plumbing, unchanged from the original plan and now confirmed necessary by
 measurement rather than assumed:
 
 - ~~A `?translation=` parameter defaulting to `asv`~~ **done.**
-  `src/translations.ts` is the registry; `/books`, `/passages` and `/search`
-  accept `?translation=`, and an unknown id is a 404 naming what is served
-  rather than a silent fall back. Every ASV response was checked byte-identical.
+  `src/translations.ts` is the registry. All five read routes accept
+  `?translation=` and 404 an unknown id, naming what is served rather than
+  silently falling back — `/books/:id` and `/books/:id/chapters/:num` were
+  answering from the ASV under HTTP 200 until 8 September. Every ASV response
+  checked byte-identical.
 - **Next:** data keyed by `(translation, book)`. **32 of 66 shared books differ
   in versification**, so `VERSE_COUNTS`, `BOOK_START`, `CHAPTER_OFFSET`,
   `sequenceOf` and `locate` all become per-translation. There is no shared
   skeleton. The registry deliberately holds no verse counts yet — carrying them
   for one translation and not the other is worse than carrying them for neither.
 - `data_availability` per `(translation, book)`. The ASV reports **ten** books as
-  `metadata_only`: TOB, JDT, WIS, SIR, BAR, 1MA, 2MA, 1ES, 3MA, MAN. How many of
-  them the DRA supplies is unverified — an earlier note here claimed seven, which
-  does not match `src/canon.ts`. Count them against the archive before relying on
-  it.
+  `metadata_only`: TOB, JDT, WIS, SIR, BAR, 1MA, 2MA, 1ES, 3MA, MAN — asserted by
+  `src/state.test.ts`. How many the DRA supplies is **unverified**; count them
+  against the archive before relying on a number.
 - Ingest must tolerate a source with **no `<d>` titles and no footnotes**. The
   ASV path assumes both exist.
 - `build:data` and `validate.ts` currently hard-code the ASV source URL and its
@@ -381,10 +413,6 @@ edition from the registry, but the fact it reports comes from `src/canon.ts`,
 where it is derived globally (`isDeuterocanon ? "metadata_only" : "full"`). The
 message can therefore name an edition while stating the ASV's availability.
 Closes when `data_availability` becomes per `(translation, book)`.
-
-**Corrected above:** the per-translation `data_availability` note claimed the ASV
-reports seven `metadata_only` books. It reports ten. Counted from
-`src/canon.ts`, not from prose.
 
 Then `build:data` and `validate.ts` need to run per translation — both currently
 hard-code the ASV source URL — and the DRA data can be generated. Its archive is
