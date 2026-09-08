@@ -320,15 +320,29 @@ check:platform` all green.
   `/search`, defaulting to `asv`; unknown ids are a 404 naming what is served.
   Every ASV response verified byte-identical.
 
-**Pick up here: move versification into the registry.**
+**Versification is in the registry — done 8 September 2026.**
 
-`src/translations.ts` deliberately holds no verse counts. The ASV's tables are
-still in `src/data/meta.ts`, reached through `src/parser.ts`. Everything that
-has to become per-translation, from `lcr find`:
+`src/versification.ts` derives the sequence tables for one edition from its
+verse counts and book order. `src/translations.ts` holds those per translation
+and memoises the derived tables in `versificationOf(id)`, lazily: cold start
+lands on whichever request an isolate serves first, so an edition nobody asks
+for is never built. `src/parser.ts` no longer imports `VERSE_COUNTS` at all —
+`chapterCount`, `verseCount`, `sequenceOf` and `locate` each take a translation,
+defaulting to the ASV, and `BOOK_START` / `CHAPTER_OFFSET` / `BOOK_STARTS` are
+gone as module globals.
 
-`VERSE_COUNTS` — `src/parser.ts` (5 sites), `src/psalms.ts`, `src/data.test.ts`,
-`scripts/build-data.ts`; plus `BOOK_START`, `CHAPTER_OFFSET`, `BOOK_STARTS`,
-`sequenceOf`, `locate`, and `src/validate.ts`'s per-book assertions.
+Proven byte-identical: `scripts/snapshot-responses.ts` captures 40 responses
+weighted to book and chapter boundaries, the corpus edges, Psalm
+superscriptions and the out-of-range cases; pre- and post-refactor output
+matched exactly (185,600 bytes). 198 tests, `tsc` clean, `src/data/` untouched
+so neither identifier moved. 31,102 `locate`+`sequenceOf` round trips cost
+17 ms — 0.55 µs each.
+
+Still ASV-only and still to do: `src/psalms.ts`, `src/data.test.ts` and
+`scripts/build-data.ts` reach for `VERSE_COUNTS` directly, `src/validate.ts`
+keeps per-book assertions, and the translation is not yet threaded through
+`parseReference` into `ensureAvailable` — the parameter is there, nothing passes
+it. That threading is the next step, and it is small.
 
 Then `build:data` and `validate.ts` need to run per translation — both currently
 hard-code the ASV source URL — and the DRA data can be generated. Its archive is
@@ -336,9 +350,12 @@ already verified: 2,946,666 bytes, sha256 `9dfbc526d699e9e461d0a8419c60dd12390e8
 and ingest tolerating a source with **no `<d>` titles and no footnotes** is the
 one parser change the DRA actually needs.
 
-**Use `lcr find` for code search.** It answers in ~0.1 s. `lcr ask` and
-`lcr inspect` time out on this hardware — a 3B model on a 2017 x86 iMac — so
-treat them as unavailable until Ben says the model situation has changed.
+**Use `lcr find` to locate code, then `lcr read` to understand it.**
+`lcr find` answers in ~0.05 s. `lcr read --question "..." --paths FILE [FILE
+...]` names the files itself and returns only the answer — prefer it to
+`lcr ask`, which has to guess which files matter. The whole pipeline works now:
+the worker moved off a 3B local model onto `gpt-oss:120b-cloud`, so the note
+that `ask` and `inspect` time out on this hardware no longer holds.
 
 ---
 

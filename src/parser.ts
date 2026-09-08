@@ -6,8 +6,8 @@
  * versification, so "John 3:99" is rejected with the actual chapter length.
  */
 
-import { VERSE_COUNTS } from "./data/meta.ts";
-import { BOOKS, PROTESTANT_ORDER } from "./canon.ts";
+import { BOOKS } from "./canon.ts";
+import { DEFAULT_TRANSLATION, resolveTranslation, versificationOf } from "./translations.ts";
 import {
   fromGreek,
   fromHebrew,
@@ -68,43 +68,36 @@ export class ParseError extends Error {
 }
 
 /* ------------------------------------------------------------------ *
- * Sequence tables, derived once from the generated verse counts.
+ * Sequence arithmetic.
+ *
+ * The tables these read live with the edition, not here — see
+ * `src/versification.ts`. Every function below takes the translation whose
+ * numbering it should use. The default keeps existing callers on the ASV, but
+ * a coordinate is only meaningful paired with an edition, so pass it wherever
+ * the caller knows it.
  * ------------------------------------------------------------------ */
 
-const BOOK_START = new Map<string, number>();
-const CHAPTER_OFFSET = new Map<string, readonly number[]>();
-
-{
-  let running = 0;
-  for (const bookId of PROTESTANT_ORDER) {
-    const chapters = VERSE_COUNTS[bookId];
-    if (chapters === undefined) throw new Error(`Missing verse counts for ${bookId}`);
-    BOOK_START.set(bookId, running + 1);
-    const offsets: number[] = [];
-    let withinBook = 0;
-    for (const count of chapters) {
-      offsets.push(withinBook);
-      withinBook += count;
-    }
-    CHAPTER_OFFSET.set(bookId, offsets);
-    running += withinBook;
-  }
+export function chapterCount(bookId: string, translation: string = DEFAULT_TRANSLATION): number {
+  return versificationOf(translation).verseCounts[bookId]?.length ?? 0;
 }
 
-/** Ascending first-sequence of each book, for binary search in {@link locate}. */
-const BOOK_STARTS: readonly number[] = PROTESTANT_ORDER.map((id) => BOOK_START.get(id) ?? 0);
-
-export function chapterCount(bookId: string): number {
-  return VERSE_COUNTS[bookId]?.length ?? 0;
+export function verseCount(
+  bookId: string,
+  chapter: number,
+  translation: string = DEFAULT_TRANSLATION,
+): number {
+  return versificationOf(translation).verseCounts[bookId]?.[chapter - 1] ?? 0;
 }
 
-export function verseCount(bookId: string, chapter: number): number {
-  return VERSE_COUNTS[bookId]?.[chapter - 1] ?? 0;
-}
-
-export function sequenceOf(bookId: string, chapter: number, verse: number): number {
-  const start = BOOK_START.get(bookId);
-  const offsets = CHAPTER_OFFSET.get(bookId);
+export function sequenceOf(
+  bookId: string,
+  chapter: number,
+  verse: number,
+  translation: string = DEFAULT_TRANSLATION,
+): number {
+  const { bookStart, chapterOffset } = versificationOf(translation);
+  const start = bookStart.get(bookId);
+  const offsets = chapterOffset.get(bookId);
   if (start === undefined || offsets === undefined) {
     throw new ParseError(`Unknown book: ${bookId}`, "unknown_book");
   }
@@ -246,16 +239,24 @@ function resolveBook(raw: string): string {
   );
 }
 
-function ensureAvailable(bookId: string, raw: string): string {
+function ensureAvailable(
+  bookId: string,
+  raw: string,
+  translation: string = DEFAULT_TRANSLATION,
+): string {
   const meta = BOOKS.get(bookId);
   if (meta !== undefined && meta.dataAvailability === "metadata_only") {
+    // Named from the registry rather than hardcoded: which books are only
+    // metadata is a fact about the edition, so the message has to say which
+    // edition it is talking about.
     throw new ParseError(
-      `${meta.name} is not present in the American Standard Version; ` +
+      `${meta.name} is not present in the ` +
+        `${resolveTranslation(translation).meta.name}; ` +
         `only its canon metadata is available`,
       "unavailable",
     );
   }
-  if (VERSE_COUNTS[bookId] === undefined) {
+  if (versificationOf(translation).verseCounts[bookId] === undefined) {
     throw new ParseError(`Unknown book: "${raw.trim()}"`, "unknown_book");
   }
   return bookId;
@@ -628,20 +629,26 @@ function formatReference(
 
 /**
  * Reverse of {@link sequenceOf}: turns a global verse sequence back into its
- * book, chapter, and verse. Throws for sequences outside 1..31102.
+ * book, chapter, and verse. Throws for sequences outside the edition's range —
+ * 1..31102 for the ASV, but that ceiling belongs to the edition, not to this
+ * function.
  */
-export function locate(sequence: number): { book: string; chapter: number; verse: number } {
+export function locate(
+  sequence: number,
+  translation: string = DEFAULT_TRANSLATION,
+): { book: string; chapter: number; verse: number } {
   if (!Number.isInteger(sequence) || sequence < 1) {
     throw new ParseError(`Verse sequence out of range: ${sequence}`, "out_of_range");
   }
+  const { order, bookStarts, chapterOffset, verseCounts } = versificationOf(translation);
   // Binary search rather than a scan: a 500-verse passage calls this once per
   // verse, and a linear pass over 66 books made that 33,000 iterations.
   let low = 0;
-  let high = BOOK_STARTS.length - 1;
+  let high = bookStarts.length - 1;
   let found = -1;
   while (low <= high) {
     const mid = (low + high) >>> 1;
-    if (BOOK_STARTS[mid]! <= sequence) {
+    if (bookStarts[mid]! <= sequence) {
       found = mid;
       low = mid + 1;
     } else {
@@ -650,11 +657,11 @@ export function locate(sequence: number): { book: string; chapter: number; verse
   }
   if (found === -1) throw new ParseError(`Verse sequence out of range: ${sequence}`, "out_of_range");
 
-  const bookId = PROTESTANT_ORDER[found]!;
-  const offsets = CHAPTER_OFFSET.get(bookId)!;
-  const chapters = VERSE_COUNTS[bookId]!;
+  const bookId = order[found]!;
+  const offsets = chapterOffset.get(bookId)!;
+  const chapters = verseCounts[bookId]!;
   const bookLength = offsets[offsets.length - 1]! + chapters[chapters.length - 1]!;
-  const withinBook = sequence - BOOK_STARTS[found]!;
+  const withinBook = sequence - bookStarts[found]!;
   if (withinBook >= bookLength) {
     throw new ParseError(`Verse sequence out of range: ${sequence}`, "out_of_range");
   }
