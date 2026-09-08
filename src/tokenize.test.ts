@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { foldForSearch, tokenize } from "./tokenize.ts";
 import { search } from "./search.ts";
-import { TEXT } from "./data/text.ts";
+import { TEXT } from "./data/asv/text.ts";
 
 describe("folding 1901 typography", () => {
   test("the corpus uses the curly apostrophe exclusively", () => {

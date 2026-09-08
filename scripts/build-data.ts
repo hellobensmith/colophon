@@ -1,26 +1,40 @@
 /**
- * Build step: turn the ebible.org USFX release into embedded TypeScript modules.
+ * Build step: turn an ebible.org USFX release into embedded TypeScript modules.
  *
- * Emits three generated files under src/data/:
+ *   bun run build:data                      # the ASV, the default
+ *   bun run build:data --translation dra    # once dra has a descriptor
+ *
+ * Emits four generated files under src/data/<translation>/:
  *   text.ts         verse text as one blob plus base36 delta-encoded lengths
  *   search-index.ts inverted index, token -> base36 delta-encoded postings
+ *   families.ts     morphological families, derived from the vocabulary
  *   meta.ts         per-chapter verse counts, titles, notes, Hebrew offsets
  *
- * Nothing is written unless every assertion in src/validate.ts passes.
+ * Writing under the edition's own directory is what stops one build from
+ * overwriting another's corpus. The artifact *names* stay bare, so the
+ * generation manifest hashes content rather than location and moving the
+ * directory leaves both identifiers untouched.
+ *
+ * Nothing is written unless every assertion in src/validate.ts passes, against
+ * the expectation set this edition declares in scripts/editions.ts.
  */
 
 import { createHash } from "node:crypto";
 
 import { parseUsfx, type UsfxDocument } from "../src/usfx.ts";
 import { validateCorpus, ValidationError } from "../src/validate.ts";
-import { ASV } from "../src/expectations/asv.ts";
-import { PROTESTANT_ORDER } from "../src/canon.ts";
+import {
+  archiveMember,
+  archiveUrl,
+  resolveEdition,
+  type BuildEdition,
+} from "./editions.ts";
+import { EDITION_ORDER } from "../src/canon.ts";
 import { buildFamilies } from "../src/morphology.ts";
 import { tokenize } from "../src/tokenize.ts";
 import { downloadWithResume, expectedSize, DownloadError } from "./download.ts";
 import {
   CANONICAL_METADATA_VERSION,
-  EDITION_ID,
   NORMALIZATION_POLICY_VERSION,
   PARSER_VERSION,
   SCHEMA_VERSION,
@@ -32,11 +46,29 @@ import {
   type GenerationManifest,
 } from "../src/identity.ts";
 
-const SOURCE_URL = "https://ebible.org/Scriptures/eng-asv_usfx.zip";
+/**
+ * Which edition this run is building. Everything below reads from it rather
+ * than from a constant, so a second text is an entry in scripts/editions.ts
+ * instead of an edit here.
+ */
+const EDITION: BuildEdition = (() => {
+  const index = process.argv.indexOf("--translation");
+  try {
+    return resolveEdition(index === -1 ? undefined : process.argv[index + 1]);
+  } catch (error) {
+    // Resolution happens at module load, before the handler around main(), so
+    // an unknown id would otherwise surface as a stack trace rather than the
+    // sentence naming what this build can produce.
+    console.error(`\n${(error as Error).message}`);
+    process.exit(1);
+  }
+})();
+
+const SOURCE_URL = archiveUrl(EDITION);
 const CACHE_DIR = new URL("../.cache/", import.meta.url).pathname;
-const ZIP_PATH = `${CACHE_DIR}eng-asv_usfx.zip`;
-const XML_PATH = `${CACHE_DIR}eng-asv_usfx.xml`;
-const DATA_DIR = new URL("../src/data/", import.meta.url).pathname;
+const ZIP_PATH = `${CACHE_DIR}${EDITION.sourceId}_usfx.zip`;
+const XML_PATH = `${CACHE_DIR}${archiveMember(EDITION)}`;
+const DATA_DIR = new URL(`../src/data/${EDITION.id}/`, import.meta.url).pathname;
 
 async function download(): Promise<void> {
   const existing = Bun.file(ZIP_PATH);
@@ -56,7 +88,7 @@ async function download(): Promise<void> {
 async function extract(): Promise<string> {
   const cached = Bun.file(XML_PATH);
   if (!(await cached.exists())) {
-    const unzip = Bun.spawn(["unzip", "-o", "-q", ZIP_PATH, "eng-asv_usfx.xml", "-d", CACHE_DIR], {
+    const unzip = Bun.spawn(["unzip", "-o", "-q", ZIP_PATH, archiveMember(EDITION), "-d", CACHE_DIR], {
       stderr: "pipe",
     });
     const code = await unzip.exited;
@@ -204,7 +236,7 @@ function buildMetaModule(doc: UsfxDocument): string {
     chapters[verse.chapter - 1] = (chapters[verse.chapter - 1] ?? 0) + 1;
   }
 
-  const countsLiteral = PROTESTANT_ORDER.map((bookId) => {
+  const countsLiteral = EDITION_ORDER[EDITION.id].map((bookId) => {
     const chapters = verseCounts.get(bookId);
     if (chapters === undefined) throw new Error(`No verses collected for ${bookId}`);
     return `  ${bookId.startsWith("1") || bookId.startsWith("2") || bookId.startsWith("3") ? `"${bookId}"` : bookId}: [${chapters.join(",")}],`;
@@ -263,7 +295,8 @@ export const TITLED_PSALMS: readonly number[] = [${titledPsalms.join(",")}];
 }
 
 async function main(): Promise<void> {
-  console.log("Downloading ASV USFX…");
+  console.log(`Building ${EDITION.id} (${EDITION.sourceId})`);
+  console.log("Downloading USFX…");
   await download();
 
   console.log("Extracting…");
@@ -278,7 +311,7 @@ async function main(): Promise<void> {
   );
 
   console.log("Validating…");
-  validateCorpus(doc, ASV);
+  validateCorpus(doc, EDITION.expectations);
   console.log("  all assertions passed");
 
   console.log("Building artifacts…");
@@ -323,7 +356,7 @@ async function main(): Promise<void> {
     parserVersion: PARSER_VERSION,
     normalizationPolicyVersion: NORMALIZATION_POLICY_VERSION,
     canonicalMetadataVersion: CANONICAL_METADATA_VERSION,
-    editionId: EDITION_ID,
+    editionId: EDITION.sourceId,
     revisionId,
     sourceArchive,
     artifacts,
@@ -363,7 +396,7 @@ async function main(): Promise<void> {
 
   for (const name of ["text.ts", "search-index.ts", "meta.ts", "families.ts"]) {
     const file = Bun.file(`${DATA_DIR}${name}`);
-    console.log(`  src/data/${name.padEnd(16)} ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+    console.log(`  src/data/${EDITION.id}/${name.padEnd(16)} ${(file.size / 1024 / 1024).toFixed(2)} MB`);
   }
 }
 

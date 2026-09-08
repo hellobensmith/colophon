@@ -28,7 +28,7 @@
  */
 
 import { PROTESTANT_ORDER } from "./canon.ts";
-import { VERSE_COUNTS } from "./data/meta.ts";
+import { VERSE_COUNTS } from "./data/asv/meta.ts";
 import { buildVersification, type Versification } from "./versification.ts";
 
 export const DEFAULT_TRANSLATION = "asv";

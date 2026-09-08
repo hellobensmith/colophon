@@ -7,8 +7,8 @@
  * rather than making the first request in an isolate pay for it.
  */
 
-import { TEXT, LENGTHS, VERSE_COUNT } from "./data/text.ts";
-import { TITLES, SUBSCRIPTIONS, NOTES } from "./data/meta.ts";
+import { TEXT, LENGTHS, VERSE_COUNT } from "./data/asv/text.ts";
+import { TITLES, SUBSCRIPTIONS, NOTES } from "./data/asv/meta.ts";
 import { locate, sequenceOf } from "./parser.ts";
 
 /** Decodes a base36 delta list into absolute values. */

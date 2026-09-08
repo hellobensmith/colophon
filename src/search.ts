@@ -10,9 +10,9 @@
  * into lines and a query pays for the handful of terms it actually touches.
  */
 
-import { INDEX, WORD_COUNTS, TOKEN_COUNT, DOC_FREQUENCIES } from "./data/search-index.ts";
+import { INDEX, WORD_COUNTS, TOKEN_COUNT, DOC_FREQUENCIES } from "./data/asv/search-index.ts";
 import { decodeDeltas, TOTAL_VERSES, verseAt, type CorpusVerse } from "./corpus.ts";
-import { FAMILY_GROUPS } from "./data/families.ts";
+import { FAMILY_GROUPS } from "./data/asv/families.ts";
 import { tokenize } from "./tokenize.ts";
 
 const K1 = 1.2;

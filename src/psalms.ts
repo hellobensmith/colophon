@@ -22,8 +22,8 @@
  * therefore has two parts: which psalm, and where the verses sit inside it.
  */
 
-import { TITLED_PSALMS } from "./data/meta.ts";
-import { VERSE_COUNTS } from "./data/meta.ts";
+import { TITLED_PSALMS } from "./data/asv/meta.ts";
+import { VERSE_COUNTS } from "./data/asv/meta.ts";
 
 const TITLED: ReadonlySet<number> = new Set(TITLED_PSALMS);
 

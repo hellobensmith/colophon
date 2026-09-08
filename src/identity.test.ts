@@ -6,7 +6,7 @@ import {
   sha256,
   type GenerationManifest,
 } from "./identity.ts";
-import { REVISION_ID, GENERATION_ID, EDITION_ID } from "./data/meta.ts";
+import { REVISION_ID, GENERATION_ID, EDITION_ID } from "./data/asv/meta.ts";
 
 const MANIFEST: GenerationManifest = {
   schemaVersion: 1,

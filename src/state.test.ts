@@ -24,7 +24,7 @@ import { existsSync } from "node:fs";
 import { BOOKS } from "./canon.ts";
 import { TOTAL_VERSES } from "./corpus.ts";
 import { versificationOf, TRANSLATION_IDS, DEFAULT_TRANSLATION } from "./translations.ts";
-import { REVISION_ID, GENERATION_ID } from "./data/meta.ts";
+import { REVISION_ID, GENERATION_ID } from "./data/asv/meta.ts";
 import { chapterCount } from "./parser.ts";
 import { verseAt } from "./corpus.ts";
 import { greekVerseCount, numberedVerses } from "./psalms.ts";

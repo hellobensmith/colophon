@@ -38,7 +38,7 @@ import {
   resolveTranslation,
   UnknownTranslationError,
 } from "./translations.ts";
-import { TITLED_PSALMS, REVISION_ID, GENERATION_ID, EDITION_ID } from "./data/meta.ts";
+import { TITLED_PSALMS, REVISION_ID, GENERATION_ID, EDITION_ID } from "./data/asv/meta.ts";
 
 /** Longest passage served in one response. */
 const MAX_PASSAGE_VERSES = 500;

@@ -2,8 +2,10 @@
 
 Last updated 8 September 2026 · public repo · deployed
 
-This file exists so a new session does not have to re-derive anything. Everything
-below was measured or verified; nothing here is recalled.
+This file is a **progress tracker**, not the source of truth. The code is the
+source of truth; this exists so a session does not re-derive what an earlier one
+already worked out, and so nothing gets forgotten between them. When the two
+disagree, the code wins and this file is what gets corrected.
 
 **Keeping it honest.** The facts in "Checked facts" are asserted by
 `src/state.test.ts`, so drift fails `bun test`. Everything else is prose and
@@ -132,11 +134,18 @@ measurement rather than assumed:
   silently falling back — `/books/:id` and `/books/:id/chapters/:num` were
   answering from the ASV under HTTP 200 until 8 September. Every ASV response
   checked byte-identical.
-- **Next:** data keyed by `(translation, book)`. **32 of 66 shared books differ
-  in versification**, so `VERSE_COUNTS`, `BOOK_START`, `CHAPTER_OFFSET`,
-  `sequenceOf` and `locate` all become per-translation. There is no shared
-  skeleton. The registry deliberately holds no verse counts yet — carrying them
-  for one translation and not the other is worse than carrying them for neither.
+- ~~Versification per translation~~ **done 8 September.** **32 of 66 shared
+  books differ**, so there is no shared skeleton: `src/versification.ts` derives
+  an edition's sequence tables, the registry carries each edition's verse counts,
+  and `versificationOf(id)` memoises the result lazily. `sequenceOf` and `locate`
+  take a translation; ~~`BOOK_START`~~ / ~~`CHAPTER_OFFSET`~~ are gone as module
+  globals.
+- **Next:** the *text* keyed by `(translation, book)`. `src/corpus.ts` still
+  imports one edition's `TEXT` statically, so `verseAt` returns ASV text whatever
+  translation was asked for. Registering a second edition before this lands would
+  serve DRA coordinates against ASV words. Needs a dispatch layer over both
+  editions' modules — and needs two editions present to design against, which is
+  why it waits on the DRA ingest rather than leading it.
 - `data_availability` per `(translation, book)`. The ASV reports **ten** books as
   `metadata_only`: TOB, JDT, WIS, SIR, BAR, 1MA, 2MA, 1ES, 3MA, MAN — asserted by
   `src/state.test.ts`. How many the DRA supplies is **unverified**; count them
@@ -170,8 +179,21 @@ measurement rather than assumed:
   `EDITION_ORDER`, so no small fixture could exist. `CorpusExpectations.order`
   now overrides it, which is also how a publisher validates a text canon.ts has
   never heard of.
-- `build:data` still hard-codes the ASV source URL and emits to `src/data/`;
-  making it per-translation, writing to `src/data/<id>/`, is next.
+- ~~`build:data` hard-codes the ASV source URL~~ **done 8 September.**
+  `bun run build:data --translation <id>` resolves a descriptor from
+  `scripts/editions.ts` — source id, archive URL, unzip member, expectation set
+  — and writes to `src/data/<id>/`. The ASV’s artifacts moved to
+  `src/data/asv/` and the 15 import sites followed. An unknown id is refused by
+  name rather than quietly building the default, which would overwrite a
+  published corpus with the wrong text.
+
+  Build-time descriptors live in `scripts/` so eBible URLs and unzip member
+  names never reach the Worker. eBible’s own ids are inconsistent —
+  `eng-asv` against `engDRA` — so `sourceId` is recorded, never derived.
+
+  Moving the output directory left **both identifiers unmoved**: the manifest
+  records artifact names, not paths, so identity binds to content. Verified by
+  rebuilding — git reported four 100% renames and no content change.
 
 The per-Worker federation idea is worth keeping as a *vision* question — it is
 how a publisher self-hosts their own text — but it is no longer forced by any

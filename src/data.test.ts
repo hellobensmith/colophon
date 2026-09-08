@@ -6,7 +6,7 @@ import {
   EXPECTED_TITLE_COUNT,
   EXPECTED_TOTAL_VERSES,
 } from "./expectations/asv.ts";
-import { VERSE_COUNTS, TITLES, SUBSCRIPTIONS, NOTES, TITLED_PSALMS } from "./data/meta.ts";
+import { VERSE_COUNTS, TITLES, SUBSCRIPTIONS, NOTES, TITLED_PSALMS } from "./data/asv/meta.ts";
 import {
   TOTAL_VERSES,
   textAt,

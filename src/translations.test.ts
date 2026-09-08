@@ -55,10 +55,15 @@ describe("the translation registry", () => {
 
   test("registry metadata matches what the corpus was built from", async () => {
     // The registry is descriptive, so it must not drift from the real source.
-    const asv = resolveTranslation("asv");
-    const build = await Bun.file(
-      new URL("../scripts/build-data.ts", import.meta.url).pathname,
-    ).text();
-    expect(build).toContain(asv.source.url);
+    // Compared against the build's own descriptor rather than grepped out of
+    // build-data.ts: the URL is assembled from an edition id now, so a text
+    // search would pass or fail for reasons unrelated to drift.
+    const { BUILD_EDITIONS, archiveUrl } = await import("../scripts/editions.ts");
+    for (const id of TRANSLATION_IDS) {
+      const registered = resolveTranslation(id);
+      const built = BUILD_EDITIONS.get(id);
+      expect(built).toBeDefined();
+      expect(registered.source.url).toBe(archiveUrl(built!));
+    }
   });
 });

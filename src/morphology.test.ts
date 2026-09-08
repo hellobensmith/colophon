@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { buildFamilies } from "./morphology.ts";
-import { INDEX } from "./data/search-index.ts";
+import { INDEX } from "./data/asv/search-index.ts";
 import { search } from "./search.ts";
 
 const TOKENS = INDEX.split("\n").map((line) => line.slice(0, line.indexOf(":")));
