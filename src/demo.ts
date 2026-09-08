@@ -29,6 +29,9 @@ export const DEMO_HTML = `<!doctype html>
 <title>Colophon — a Scripture API that tells you which text you hold</title>
 <meta name="description" content="Two complete public-domain Bibles as one REST API: the American Standard Version and the Douay-Rheims. Reference parsing, three canon traditions, and an edition identifier on every response.">
 <link rel="icon" href="${FAVICON}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Funnel+Sans:wght@400;500;600&display=swap">
 <style>
 @layer reset, base, layout, components;
 
@@ -68,8 +71,10 @@ export const DEMO_HTML = `<!doctype html>
 
     /* Type. A serif carries scripture, because that is what it is; the
        interface around it stays in the system sans. */
-    --font-family-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-    --font-family-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, ui-serif, serif;
+    --font-family-sans: "Funnel Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* Scripture is set in Newsreader: a text face with a real italic, which the
+       Psalter's superscriptions and the reference headings both use. */
+    --font-family-serif: "Newsreader", "Iowan Old Style", Palatino, Georgia, ui-serif, serif;
     --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
     --font-size-xs:   clamp(0.72rem, 0.70rem + 0.10vw, 0.78rem);
