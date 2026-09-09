@@ -32,7 +32,12 @@ import {
   identityOf,
   type CorpusVerse,
 } from "./corpus.ts";
-import { search, countQueryTerms, MAX_QUERY_TERMS } from "./search.ts";
+import {
+  search,
+  countQueryTerms,
+  MAX_QUERY_TERMS,
+  SEARCHABLE_TRANSLATIONS,
+} from "./search.ts";
 import { DEMO_HTML } from "./demo.ts";
 import {
   DEFAULT_TRANSLATION,
@@ -43,11 +48,7 @@ import {
 import { TITLED_PSALMS } from "./data/asv/meta.ts";
 import { OPENAPI } from "./openapi.ts";
 
-/**
- * The one edition the inverted index covers. Everything else this deployment
- * serves works for passages and books; only search is still single-edition.
- */
-const SEARCHABLE_TRANSLATION = "asv";
+
 
 /** Longest passage served in one response. */
 const MAX_PASSAGE_VERSES = 500;
@@ -423,16 +424,16 @@ app.get("/passages", (context) => {
 
 app.get("/search", (context) => {
   const translation = translationOf(context);
-  // The inverted index is built over one edition. Answering from it while
-  // labelling the response with another translation would be the silent wrong
-  // answer the conformance suite records against other APIs, so say so instead.
-  if (translation.meta.id !== SEARCHABLE_TRANSLATION) {
+  // An edition without an index cannot be searched, and answering from
+  // another edition's index while labelling the response with this one would
+  // be the silent wrong answer the conformance suite records elsewhere.
+  if (!SEARCHABLE_TRANSLATIONS.includes(translation.meta.id)) {
     throw new HttpError(
       501,
       "not_implemented",
-      `Search is not available for ${translation.meta.name} yet; the index ` +
-        `covers ${SEARCHABLE_TRANSLATION} only. Passages and books work for ` +
-        `every translation this deployment serves.`,
+      `Search is not available for ${translation.meta.name}; no index is embedded for it. ` +
+        `Indexed editions: ${SEARCHABLE_TRANSLATIONS.join(", ")}. Passages and ` +
+        `books work for every translation this deployment serves.`,
     );
   }
   const query = context.req.query("q") ?? "";
@@ -464,7 +465,7 @@ app.get("/search", (context) => {
   const limit = parseBounded(context.req.query("limit"), DEFAULT_SEARCH_LIMIT, 1, MAX_SEARCH_LIMIT, "limit");
   const offset = parseBounded(context.req.query("offset"), 0, 0, Number.MAX_SAFE_INTEGER, "offset");
 
-  const outcome = search(query, limit, offset);
+  const outcome = search(query, limit, offset, translation.meta.id);
 
   context.header("Cache-Control", BRIEF);
   return context.json({

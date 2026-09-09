@@ -10,7 +10,11 @@
  * into lines and a query pays for the handful of terms it actually touches.
  */
 
-import { INDEX, WORD_COUNTS, TOKEN_COUNT, DOC_FREQUENCIES } from "./data/asv/search-index.ts";
+import * as asvIndex from "./data/asv/search-index.ts";
+import * as draIndex from "./data/dra/search-index.ts";
+import * as asvFamilies from "./data/asv/families.ts";
+import * as draFamilies from "./data/dra/families.ts";
+import { DEFAULT_TRANSLATION, UnknownTranslationError } from "./translations.ts";
 import { decodeDeltas, totalVersesOf, verseAt, type CorpusVerse } from "./corpus.ts";
 
 /**
@@ -21,9 +25,102 @@ import { decodeDeltas, totalVersesOf, verseAt, type CorpusVerse } from "./corpus
  * src/index.ts declines such a request instead of serving it, and this constant
  * is the reason it has to.
  */
-const SEARCH_TRANSLATION = "asv";
-const SEARCH_CORPUS_SIZE = totalVersesOf(SEARCH_TRANSLATION);
-import { FAMILY_GROUPS } from "./data/asv/families.ts";
+/**
+ * Everything a query needs about one edition, derived once and kept.
+ *
+ * Built on first use rather than at module scope. Splitting the index into
+ * lines and decoding the length tables costs real work, and Cloudflare charges
+ * global-scope evaluation against a startup budget paid by whichever request an
+ * isolate happens to serve first — so an edition nobody searches is never
+ * built. The same reasoning as versificationOf and the corpus tables.
+ */
+interface SearchIndex {
+  readonly translation: string;
+  readonly lines: readonly string[];
+  /** Token per line, sorted, so lookup is a binary search. */
+  readonly tokens: readonly string[];
+  /** Decoded postings, filled in as they are first read. */
+  readonly postings: (Int32Array | undefined)[];
+  readonly wordLengths: Int32Array;
+  readonly docFrequency: Int32Array;
+  readonly families: ReadonlyMap<string, readonly string[]>;
+  readonly averageLength: number;
+  readonly corpusSize: number;
+}
+
+const INDEX_SOURCES: Readonly<Record<string, {
+  index: string;
+  wordCounts: string;
+  tokenCount: number;
+  docFrequencies: string;
+  familyGroups: string;
+}>> = {
+  asv: {
+    index: asvIndex.INDEX,
+    wordCounts: asvIndex.WORD_COUNTS,
+    tokenCount: asvIndex.TOKEN_COUNT,
+    docFrequencies: asvIndex.DOC_FREQUENCIES,
+    familyGroups: asvFamilies.FAMILY_GROUPS,
+  },
+  dra: {
+    index: draIndex.INDEX,
+    wordCounts: draIndex.WORD_COUNTS,
+    tokenCount: draIndex.TOKEN_COUNT,
+    docFrequencies: draIndex.DOC_FREQUENCIES,
+    familyGroups: draFamilies.FAMILY_GROUPS,
+  },
+};
+
+/** Editions with an index embedded, as opposed to merely being registered. */
+export const SEARCHABLE_TRANSLATIONS: readonly string[] = Object.keys(INDEX_SOURCES);
+
+const BUILT = new Map<string, SearchIndex>();
+
+function indexFor(translation: string = DEFAULT_TRANSLATION): SearchIndex {
+  const cached = BUILT.get(translation);
+  if (cached !== undefined) return cached;
+
+  const source = INDEX_SOURCES[translation];
+  if (source === undefined) throw new UnknownTranslationError(translation);
+
+  const lines = source.index.split("\n");
+  const tokens = lines.map((line) => {
+    const colon = line.indexOf(":");
+    if (colon === -1) throw new Error("Malformed index line without a separator");
+    return line.slice(0, colon);
+  });
+  if (tokens.length !== source.tokenCount) {
+    throw new Error(
+      `${translation} index holds ${tokens.length} tokens, expected ${source.tokenCount}`,
+    );
+  }
+
+  const corpusSize = totalVersesOf(translation);
+  const wordLengths = decodeDeltas(source.wordCounts, corpusSize);
+
+  const families = new Map<string, readonly string[]>();
+  for (const line of source.familyGroups.split("\n")) {
+    const family = line.split(",");
+    for (const member of family) families.set(member, family);
+  }
+
+  let total = 0;
+  for (let i = 0; i < wordLengths.length; i += 1) total += wordLengths[i]!;
+
+  const built: SearchIndex = {
+    translation,
+    lines,
+    tokens,
+    postings: new Array<Int32Array | undefined>(lines.length),
+    wordLengths,
+    docFrequency: decodeDeltas(source.docFrequencies, source.tokenCount),
+    families,
+    averageLength: total / wordLengths.length,
+    corpusSize,
+  };
+  BUILT.set(translation, built);
+  return built;
+}
 import { tokenize } from "./tokenize.ts";
 
 const K1 = 1.2;
@@ -87,56 +184,6 @@ const MAX_PREFIX_EXPANSIONS = 64;
  */
 export const MAX_QUERY_TERMS = 12;
 
-const LINES: readonly string[] = INDEX.split("\n");
-
-const TOKENS: readonly string[] = LINES.map((line) => {
-  const colon = line.indexOf(":");
-  if (colon === -1) throw new Error("Malformed index line without a separator");
-  return line.slice(0, colon);
-});
-
-if (TOKENS.length !== TOKEN_COUNT) {
-  throw new Error(`Index holds ${TOKENS.length} tokens, expected ${TOKEN_COUNT}`);
-}
-
-const POSTINGS_CACHE: (Int32Array | undefined)[] = new Array<Int32Array | undefined>(
-  LINES.length,
-);
-
-const WORD_LENGTHS: Int32Array = decodeDeltas(WORD_COUNTS, SEARCH_CORPUS_SIZE);
-
-/**
- * How many verses each token appears in.
- *
- * Shipped rather than derived, because weighing a term otherwise means decoding
- * its postings purely to measure their length — and a trailing wildcard can
- * expand to dozens of terms, none of which the query may end up scanning.
- */
-const DOC_FREQUENCY: Int32Array = decodeDeltas(DOC_FREQUENCIES, TOKEN_COUNT);
-
-/**
- * Surface forms grouped by lemma, so "speak" reaches "spake" and "say" reaches
- * "said".
- *
- * Derived at build time rather than here. Computing the families from the
- * vocabulary on every isolate start measured 14 ms locally and several times
- * that in production, against a bundle cost of 14 KB for shipping them.
- */
-const FAMILIES: ReadonlyMap<string, readonly string[]> = (() => {
-  const lookup = new Map<string, readonly string[]>();
-  for (const line of FAMILY_GROUPS.split("\n")) {
-    const family = line.split(",");
-    for (const member of family) lookup.set(member, family);
-  }
-  return lookup;
-})();
-
-const AVERAGE_LENGTH: number = (() => {
-  let total = 0;
-  for (let index = 0; index < WORD_LENGTHS.length; index += 1) total += WORD_LENGTHS[index]!;
-  return total / WORD_LENGTHS.length;
-})();
-
 /** Base36 digit value, or -1. */
 function base36Digit(code: number): number {
   if (code >= 48 && code <= 57) return code - 48;
@@ -156,16 +203,21 @@ function base36Digit(code: number): number {
  * Returns how many were decoded, which is fewer than requested only when the
  * token's list runs out first.
  */
-function seedPostings(index: number, max: number, into: Set<number>): number {
+function seedPostings(
+  ix: SearchIndex,
+  index: number,
+  max: number,
+  into: Set<number>,
+): number {
   if (max <= 0) return 0;
-  const cached = POSTINGS_CACHE[index];
+  const cached = ix.postings[index];
   if (cached !== undefined) {
     const take = Math.min(cached.length, max);
     for (let position = 0; position < take; position += 1) into.add(cached[position]!);
     return take;
   }
 
-  const line = LINES[index]!;
+  const line = ix.lines[index]!;
   let cursor = line.indexOf(":") + 1;
   let running = 0;
   let count = 0;
@@ -187,10 +239,10 @@ function seedPostings(index: number, max: number, into: Set<number>): number {
   return count;
 }
 
-function postingsAt(index: number): Int32Array {
-  const cached = POSTINGS_CACHE[index];
+function postingsAt(ix: SearchIndex, index: number): Int32Array {
+  const cached = ix.postings[index];
   if (cached !== undefined) return cached;
-  const line = LINES[index]!;
+  const line = ix.lines[index]!;
   const encoded = line.slice(line.indexOf(":") + 1);
   const parts = encoded.split(",");
   const values = new Int32Array(parts.length);
@@ -199,17 +251,17 @@ function postingsAt(index: number): Int32Array {
     running += Number.parseInt(parts[position]!, 36);
     values[position] = running;
   }
-  POSTINGS_CACHE[index] = values;
+  ix.postings[index] = values;
   return values;
 }
 
 /** Index of `token`, or -1. TOKENS is sorted, so this is a binary search. */
-function findToken(token: string): number {
+function findToken(ix: SearchIndex, token: string): number {
   let low = 0;
-  let high = TOKENS.length - 1;
+  let high = ix.tokens.length - 1;
   while (low <= high) {
     const mid = (low + high) >>> 1;
-    const value = TOKENS[mid]!;
+    const value = ix.tokens[mid]!;
     if (value === token) return mid;
     if (value < token) low = mid + 1;
     else high = mid - 1;
@@ -218,12 +270,12 @@ function findToken(token: string): number {
 }
 
 /** First index whose token is >= prefix. */
-function lowerBound(prefix: string): number {
+function lowerBound(ix: SearchIndex, prefix: string): number {
   let low = 0;
-  let high = TOKENS.length;
+  let high = ix.tokens.length;
   while (low < high) {
     const mid = (low + high) >>> 1;
-    if (TOKENS[mid]! < prefix) low = mid + 1;
+    if (ix.tokens[mid]! < prefix) low = mid + 1;
     else high = mid;
   }
   return low;
@@ -265,20 +317,20 @@ interface Term {
  * itself, the rest of its morphological family, and — for the final token — any
  * term it prefixes, which gives a trailing wildcard for partially typed words.
  */
-function resolveTerm(token: string, isLast: boolean): Term | null {
+function resolveTerm(ix: SearchIndex, token: string, isLast: boolean): Term | null {
   const indices = new Set<number>();
 
-  const exact = findToken(token);
+  const exact = findToken(ix, token);
   if (exact !== -1) indices.add(exact);
 
-  for (const relative of FAMILIES.get(token) ?? []) {
-    const index = findToken(relative);
+  for (const relative of ix.families.get(token) ?? []) {
+    const index = findToken(ix, relative);
     if (index !== -1) indices.add(index);
   }
 
   if (isLast) {
-    for (let index = lowerBound(token); index < TOKENS.length; index += 1) {
-      if (!TOKENS[index]!.startsWith(token)) break;
+    for (let index = lowerBound(ix, token); index < ix.tokens.length; index += 1) {
+      if (!ix.tokens[index]!.startsWith(token)) break;
       if (indices.size >= MAX_PREFIX_EXPANSIONS) break;
       indices.add(index);
     }
@@ -287,14 +339,14 @@ function resolveTerm(token: string, isLast: boolean): Term | null {
   if (indices.size === 0) return null;
   const list = [...indices];
   let frequency = 0;
-  for (const index of list) frequency += DOC_FREQUENCY[index]!;
+  for (const index of list) frequency += ix.docFrequency[index]!;
   return { indices: list, documentFrequency: frequency };
 }
 
-function resolveTerms(tokens: readonly string[]): Term[] {
+function resolveTerms(ix: SearchIndex, tokens: readonly string[]): Term[] {
   const terms: Term[] = [];
   tokens.forEach((token, position) => {
-    const term = resolveTerm(token, position === tokens.length - 1);
+    const term = resolveTerm(ix, token, position === tokens.length - 1);
     if (term !== null) terms.push(term);
   });
   return terms;
@@ -314,22 +366,29 @@ function postingsContain(postings: Int32Array, document: number): boolean {
   return false;
 }
 
-function termMatches(term: Term, document: number): boolean {
+function termMatches(ix: SearchIndex, term: Term, document: number): boolean {
   for (const tokenIndex of term.indices) {
-    if (postingsContain(postingsAt(tokenIndex), document)) return true;
+    if (postingsContain(postingsAt(ix, tokenIndex), document)) return true;
   }
   return false;
 }
 
-export function search(query: string, limit: number, offset: number): SearchOutcome {
+export function search(
+  query: string,
+  limit: number,
+  offset: number,
+  translation: string = DEFAULT_TRANSLATION,
+): SearchOutcome {
+  const ix = indexFor(translation);
+
   // Deduplicated and capped. The endpoint rejects an over-long query with a 400
   // so a caller is told rather than silently truncated, but the library bounds
   // itself too — a direct caller must not be able to spend unbounded CPU either.
   const tokens = [...new Set(tokenizeQuery(query))].slice(0, MAX_QUERY_TERMS);
   if (tokens.length === 0) return { total: 0, hits: [], truncated: false };
 
-  const terms = resolveTerms(tokens);
-  // A word absent from the ASV cannot be satisfied, so the whole query fails.
+  const terms = resolveTerms(ix, tokens);
+  // A word absent from this edition cannot be satisfied, so the query fails.
   if (terms.length !== tokens.length) return { total: 0, hits: [], truncated: false };
 
   // Rarest first. Only this term's postings are ever materialized; the rest
@@ -343,7 +402,7 @@ export function search(query: string, limit: number, offset: number): SearchOutc
   const seed = new Set<number>();
   for (const tokenIndex of rarest.indices) {
     const budget = MAX_POSTINGS_SCANNED - scanned;
-    const decoded = seedPostings(tokenIndex, budget, seed);
+    const decoded = seedPostings(ix, tokenIndex, budget, seed);
     scanned += decoded;
     // Hitting the budget exactly means the list may well have continued.
     if (decoded === budget) {
@@ -354,7 +413,7 @@ export function search(query: string, limit: number, offset: number): SearchOutc
 
   let candidates = [...seed];
   for (const term of rest) {
-    candidates = candidates.filter((document) => termMatches(term, document));
+    candidates = candidates.filter((document) => termMatches(ix, term, document));
     if (candidates.length === 0) break;
   }
 
@@ -373,17 +432,17 @@ export function search(query: string, limit: number, offset: number): SearchOutc
   const idfTotal = terms.reduce(
     (sum, term) =>
       sum +
-      Math.log(1 + (SEARCH_CORPUS_SIZE - term.documentFrequency + 0.5) / (term.documentFrequency + 0.5)),
+      Math.log(1 + (ix.corpusSize - term.documentFrequency + 0.5) / (term.documentFrequency + 0.5)),
     0,
   );
 
   candidates.sort((a, b) => {
-    const byLength = WORD_LENGTHS[a]! - WORD_LENGTHS[b]!;
+    const byLength = ix.wordLengths[a]! - ix.wordLengths[b]!;
     return byLength !== 0 ? byLength : a - b;
   });
 
   const scoreOf = (document: number): number => {
-    const normalization = 1 + K1 * (1 - B + (B * WORD_LENGTHS[document]!) / AVERAGE_LENGTH);
+    const normalization = 1 + K1 * (1 - B + (B * ix.wordLengths[document]!) / ix.averageLength);
     return (idfTotal * (K1 + 1)) / normalization;
   };
 
@@ -392,7 +451,11 @@ export function search(query: string, limit: number, offset: number): SearchOutc
     total: candidates.length,
     truncated,
     hits: page.map((document) => ({
-      ...verseAt(document + 1),
+      // Postings are sequences in *this* edition, so the verse has to be read
+      // from it too. Resolving against the default returned another edition’s
+      // words under this one’s coordinate — a hit whose text does not contain
+      // the term that matched it.
+      ...verseAt(document + 1, ix.translation),
       score: Math.round(scoreOf(document) * 10_000) / 10_000,
     })),
   };

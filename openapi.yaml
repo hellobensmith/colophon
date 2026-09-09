@@ -344,9 +344,9 @@ paths:
       responses:
         "501":
           description: |
-            The full-text index covers the ASV only. Rather than answer from it
-            while labelling the response with another translation, this route
-            declines and names what it does cover.
+            No index is embedded for the requested translation. Rather than
+            answer from another edition index while labelling the response with
+            this one, the route declines and names the editions it can search.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }

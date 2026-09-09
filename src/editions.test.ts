@@ -132,18 +132,20 @@ describe("the invisible case, which is the one that matters", () => {
   });
 });
 
-describe("what is not per-translation yet says so", () => {
-  // The inverted index covers one edition. Answering from it under another
-  // translation's name would be the silent wrong answer, so the route declines.
-  test("search refuses a translation it has no index for", async () => {
-    const dra = await get("/search?q=beginning&translation=dra");
-    expect(dra.status).toBe(501);
-    expect(dra.body.error).toBe("not_implemented");
-    expect(dra.body.detail).toContain("asv");
+describe("every registered edition can actually be searched", () => {
+  // The 501 path is unreachable while every registered translation has an index
+  // embedded, and that is the point: the guard exists so a future edition
+  // registered without one is refused rather than answered from a neighbour’s
+  // postings. This asserts the invariant, not the error page.
+  test("nothing is registered that search cannot serve", async () => {
+    const { SEARCHABLE_TRANSLATIONS } = await import("./search.ts");
+    expect([...SEARCHABLE_TRANSLATIONS].sort()).toEqual([...TRANSLATION_IDS].sort());
 
-    const asv = await get("/search?q=beginning&translation=asv");
-    expect(asv.status).toBe(200);
-    expect(asv.body.total).toBeGreaterThan(0);
+    for (const id of TRANSLATION_IDS) {
+      const response = await get(`/search?q=beginning&translation=${id}`);
+      expect({ id, status: response.status }).toEqual({ id, status: 200 });
+      expect(response.body.total).toBeGreaterThan(0);
+    }
   });
 });
 
@@ -260,6 +262,69 @@ describe("psalm numbering is a fact about the edition", () => {
       const response = await get(`/passages?ref=Psalm+51:1&translation=${id}&numbering=english`);
       expect(response.status).toBe(200);
       expect(response.body.verses).toHaveLength(1);
+    }
+  });
+});
+
+describe("search covers both editions, each from its own index", () => {
+  /**
+   * The bug this guards against was not that search failed — it succeeded.
+   * Postings were read from the Douay-Rheims index while the hits themselves
+   * were resolved against the ASV corpus, so a query returned real verses,
+   * correctly numbered, whose text did not contain the term that matched them.
+   * A relevance check catches that; a status check does not.
+   */
+  test("every hit actually contains a member of the term's family", async () => {
+    const { tokenize } = await import("./tokenize.ts");
+    const families = {
+      asv: (await import("./data/asv/families.ts")).FAMILY_GROUPS,
+      dra: (await import("./data/dra/families.ts")).FAMILY_GROUPS,
+    };
+
+    for (const edition of ["asv", "dra"] as const) {
+      for (const query of ["shepherd", "mercy"]) {
+        const response = await get(`/search?q=${query}&limit=40&translation=${edition}`);
+        expect(response.status).toBe(200);
+        expect(response.body.total).toBeGreaterThan(0);
+
+        const family =
+          families[edition]
+            .split("\n")
+            .map((line) => line.split(","))
+            .find((group) => group.includes(query)) ?? [query];
+
+        for (const hit of response.body.results) {
+          const words = tokenize(hit.text);
+          expect({
+            edition,
+            query,
+            id: hit.id,
+            matched: family.some((form: string) => words.includes(form)),
+          }).toEqual({ edition, query, id: hit.id, matched: true });
+        }
+      }
+    }
+  });
+
+  test("the two editions return different totals for the same query", async () => {
+    const asv = await get("/search?q=shepherd&translation=asv");
+    const dra = await get("/search?q=shepherd&translation=dra");
+    expect(asv.body.total).toBeGreaterThan(0);
+    expect(dra.body.total).toBeGreaterThan(0);
+    expect(asv.body.total).not.toBe(dra.body.total);
+  });
+
+  test("a DRA search reaches books the ASV does not carry", async () => {
+    const response = await get("/search?q=wisdom&limit=100&translation=dra");
+    const books = new Set(response.body.results.map((hit: { book: string }) => hit.book));
+    const deuterocanonical = ["TOB", "JDT", "WIS", "SIR", "BAR", "1MA", "2MA"];
+    expect(deuterocanonical.some((id) => books.has(id))).toBe(true);
+  });
+
+  test("each response names the translation it searched", async () => {
+    for (const edition of ["asv", "dra"]) {
+      const response = await get(`/search?q=beginning&translation=${edition}`);
+      expect(response.body.translation.id).toBe(edition);
     }
   });
 });
