@@ -63,6 +63,22 @@ export interface Translation {
    */
   readonly verseCounts: Readonly<Record<string, readonly number[]>>;
   readonly order: readonly string[];
+  /**
+   * Psalm numbering schemes this edition can be addressed in, beyond the one
+   * it prints.
+   *
+   * Less a capability list than a statement about the text. The ASV prints the
+   * Hebrew division of the Psalter, so a Hebrew- or Greek-numbered request can
+   * be converted onto it. The Douay-Rheims already prints the Greek division —
+   * its Psalm 50 is the Miserere — so asking for Greek numbering of the DRA is
+   * asking to convert a text that is already in the target scheme, and
+   * src/psalms.ts holds the ASV relationship rather than a general one.
+   *
+   * Empty means: only the numbering this edition prints. The alternative was
+   * answering from another edition's offsets, which returned HTTP 200 and no
+   * verses at all until 8 September.
+   */
+  readonly psalmSchemes: readonly string[];
 }
 
 const ASV: Translation = {
@@ -81,6 +97,7 @@ const ASV: Translation = {
   editionId: "asv",
   verseCounts: ASV_VERSE_COUNTS,
   order: EDITION_ORDER.asv,
+  psalmSchemes: ["hebrew", "greek"],
 };
 
 const DRA: Translation = {
@@ -99,6 +116,9 @@ const DRA: Translation = {
   editionId: "dra",
   verseCounts: DRA_VERSE_COUNTS,
   order: EDITION_ORDER.dra,
+  // The Greek division is what this edition prints. Converting onto it needs
+  // the inverse of what psalms.ts encodes, which is real work and not done.
+  psalmSchemes: [],
 };
 
 /**

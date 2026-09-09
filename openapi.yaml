@@ -242,6 +242,15 @@ paths:
             enum: [english, hebrew, greek]
             default: english
       responses:
+        "501":
+          description: |
+            Psalm numbering conversion is defined per edition. An edition that
+            already prints the requested division cannot be converted onto it,
+            and the request is refused rather than answered from another
+            edition offsets.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "200":
           description: The verses the reference selects.
           content:

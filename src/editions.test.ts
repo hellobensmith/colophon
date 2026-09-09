@@ -207,3 +207,59 @@ describe("ambiguity is a fact about the edition, not the abbreviation", () => {
     expect(response.body.detail).not.toContain("Unknown book");
   });
 });
+
+describe("psalm numbering is a fact about the edition", () => {
+  /**
+   * The ASV prints the Hebrew division of the Psalter, so a Hebrew- or
+   * Greek-numbered request converts onto it. The Douay-Rheims already prints
+   * the Greek division — its Psalm 50 is the Miserere — so the same request
+   * asks to convert a text that is already in the target scheme, using
+   * offsets that belong to another edition.
+   *
+   * Until 8 September that returned HTTP 200 with an empty verse array, which
+   * a caller cannot tell apart from a psalm that genuinely has no verses. An
+   * empty success is the worst of the failure modes this project refuses,
+   * because nothing downstream can even see it.
+   */
+  test("the DRA prints the Greek division natively", async () => {
+    const dra = await passage("Psalm 50:1", "dra");
+    const asv = await passage("Psalm 51:1", "asv");
+    expect(dra.status).toBe(200);
+    expect(asv.status).toBe(200);
+    // The same psalm, numbered differently by each edition.
+    expect(asv.body.verses[0].text).toContain("Have mercy upon me");
+    expect(dra.body.verses[0].id).toBe("PSA.50.1");
+  });
+
+  test("an unconvertible numbering is refused, not answered emptily", async () => {
+    for (const scheme of ["hebrew", "greek"]) {
+      const response = await get(
+        `/passages?ref=Psalm+51:1&translation=dra&numbering=${scheme}`,
+      );
+      expect(response.status).toBe(501);
+      expect(response.body.error).toBe("not_implemented");
+      expect(response.body.detail).toContain("Douay-Rheims");
+      expect(response.body.detail).toContain(scheme);
+      // Never a 200 carrying nothing.
+      expect(response.body.verses).toBeUndefined();
+    }
+  });
+
+  test("the ASV still converts both ways", async () => {
+    for (const [scheme, id] of [["hebrew", "PSA.51.0"], ["greek", "PSA.52.0"]] as const) {
+      const response = await get(
+        `/passages?ref=Psalm+51:1&translation=asv&numbering=${scheme}`,
+      );
+      expect(response.status).toBe(200);
+      expect(response.body.verses[0].id).toBe(id);
+    }
+  });
+
+  test("and english numbering works for every edition", async () => {
+    for (const id of ["asv", "dra"]) {
+      const response = await get(`/passages?ref=Psalm+51:1&translation=${id}&numbering=english`);
+      expect(response.status).toBe(200);
+      expect(response.body.verses).toHaveLength(1);
+    }
+  });
+});

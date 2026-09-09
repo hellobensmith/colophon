@@ -37,6 +37,7 @@ import { DEMO_HTML } from "./demo.ts";
 import {
   DEFAULT_TRANSLATION,
   resolveTranslation,
+  TRANSLATION_IDS,
   UnknownTranslationError,
 } from "./translations.ts";
 import { TITLED_PSALMS } from "./data/asv/meta.ts";
@@ -356,6 +357,24 @@ app.get("/passages", (context) => {
       400,
       "bad_request",
       `Unknown numbering "${numberingParam}". Use english, hebrew, or greek.`,
+    );
+  }
+
+  // Converting between psalm numbering schemes uses one edition's relationship
+  // between them. Applying the ASV's to a text that already prints the Greek
+  // division produced a 200 carrying no verses, which a caller cannot tell
+  // apart from a psalm that genuinely has none.
+  if (numberingParam !== "english" && !translation.psalmSchemes.includes(numberingParam)) {
+    const alternatives = TRANSLATION_IDS.filter(
+      (id) => id !== translation.meta.id && resolveTranslation(id).psalmSchemes.includes(numberingParam),
+    );
+    throw new HttpError(
+      501,
+      "not_implemented",
+      `${translation.meta.name} cannot be addressed in ${numberingParam} numbering. ` +
+        `It prints its own division of the Psalter and the conversion onto it is ` +
+        `not implemented. Request it without ?numbering` +
+        (alternatives.length > 0 ? `, or use ${alternatives.join(", ")}.` : "."),
     );
   }
 
