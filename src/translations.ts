@@ -164,7 +164,7 @@ export function resolveTranslation(value: string | undefined): Translation {
  */
 const VERSIFICATIONS = new Map<string, Versification>();
 
-export function versificationOf(id: string = DEFAULT_TRANSLATION): Versification {
+export function versificationOf(id: string): Versification {
   const cached = VERSIFICATIONS.get(id);
   if (cached !== undefined) return cached;
 

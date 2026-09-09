@@ -45,9 +45,9 @@ describe("search reaches words as they are actually typed", () => {
    * apostrophe, and æ was read as a word separator.
    */
   test("a possessive typed on an ordinary keyboard finds the verses", () => {
-    const typed = search("Jehovah's", 3, 0);
+    const typed = search("Jehovah's", 3, 0, "asv");
     expect(typed.total).toBeGreaterThan(5000);
-    expect(typed.total).toBe(search("Jehovah’s", 3, 0).total);
+    expect(typed.total).toBe(search("Jehovah’s", 3, 0, "asv").total);
   });
 
   test("the modern spelling of a ligatured name finds it", () => {
@@ -57,23 +57,23 @@ describe("search reaches words as they are actually typed", () => {
       ["Zacchaeus", "Zacchæus"],
       ["Galilaean", "Galilæan"],
     ] as const) {
-      const a = search(modern, 1, 0);
-      const b = search(printed, 1, 0);
+      const a = search(modern, 1, 0, "asv");
+      const b = search(printed, 1, 0, "asv");
       expect(a.total).toBe(b.total);
       expect(a.total).toBeGreaterThan(0);
     }
   });
 
   test("Caesar no longer matches Sarai", () => {
-    for (const hit of search("Caesar", 10, 0).hits) {
+    for (const hit of search("Caesar", 10, 0, "asv").hits) {
       expect(hit.text.toLowerCase()).toContain("sar");
       expect(/cæsar|caesar/i.test(hit.text)).toBe(true);
     }
   });
 
   test("the ordinary path is unchanged", () => {
-    expect(search("good shepherd", 1, 0).total).toBe(2);
-    expect(search("faith hope love", 1, 0).hits[0]!.id).toBe("1CO.13.13");
-    expect(search("speak", 100, 0).hits.some((hit) => /spake/i.test(hit.text))).toBe(true);
+    expect(search("good shepherd", 1, 0, "asv").total).toBe(2);
+    expect(search("faith hope love", 1, 0, "asv").hits[0]!.id).toBe("1CO.13.13");
+    expect(search("speak", 100, 0, "asv").hits.some((hit) => /spake/i.test(hit.text))).toBe(true);
   });
 });

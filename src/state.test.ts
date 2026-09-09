@@ -150,14 +150,14 @@ describe("STATE.md's prose numbers match the corpus", () => {
   // These are stated in sentences rather than the facts table, and were just as
   // capable of drifting.
   test("Esther and Daniel chapter counts", () => {
-    expect(STATE).toContain(`EST is ${chapterCount("EST")} chapters in the ASV`);
-    expect(STATE).toMatch(new RegExp(`DAN is ${chapterCount("DAN")} and`));
+    expect(STATE).toContain(`EST is ${chapterCount("EST", "asv")} chapters in the ASV`);
+    expect(STATE).toMatch(new RegExp(`DAN is ${chapterCount("DAN", "asv")} and`));
   });
 
   test("empty verse count", () => {
     let empty = 0;
     for (let sequence = 1; sequence <= TOTAL_VERSES; sequence += 1) {
-      if (verseAt(sequence).text.trim() === "") empty += 1;
+      if (verseAt(sequence, "asv").text.trim() === "") empty += 1;
     }
     expect(STATE).toContain(`where the ASV has ${empty}`);
   });

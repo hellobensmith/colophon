@@ -201,7 +201,8 @@ function serializeBook(bookId: string, translation: string = DEFAULT_TRANSLATION
   };
 }
 
-function serializePassageVerse(verse: CorpusVerse) {
+function serializePassageVerse(verse: CorpusVerse, translation: string) {
+  attest(translation, verse);
   return {
     id: verse.id,
     book: verse.book,
@@ -233,6 +234,33 @@ app.get("/", (context) => {
  * bundled with the Worker, so the running code and its published description
  * ship together.
  */
+/**
+ * The colophon promise, checked rather than asserted.
+ *
+ * Every response names the translation it came from. This checks the verses in
+ * it actually did — that none was read from one edition and served under
+ * another's name.
+ *
+ * It exists because that exact mistake happened three times while this API grew
+ * a second edition: Esther 14:1 came back as Job 3:5, a psalm request returned
+ * an empty success, and a search answered from the wrong index. Every one was
+ * HTTP 200 carrying a real, well-formed, correctly numbered verse from the
+ * wrong Bible. A status code cannot see that. A schema cannot see it. Only
+ * provenance can, so verses carry theirs and this is where it is read.
+ *
+ * A failure here is a fault in this file rather than bad input, so it raises
+ * instead of blaming the caller.
+ */
+export function attest<T extends CorpusVerse>(translation: string, verse: T): T {
+  if (verse.translation !== translation) {
+    throw new Error(
+      `Provenance mismatch on ${verse.id}: the response names ${translation} ` +
+        `but this verse was read from ${verse.translation}. Refusing to serve ` +
+        `one edition's words under another's name.`,
+    );
+  }
+  return verse;
+}
 app.get("/openapi.yaml", (context) => {
   context.header("Content-Type", "application/yaml; charset=utf-8");
   context.header("Cache-Control", DAILY);
@@ -313,7 +341,10 @@ app.get("/books/:id/chapters/:num", (context) => {
   const verses = [];
   const count = verseCount(id, chapter, translation.meta.id);
   for (let number = 1; number <= count; number += 1) {
-    const verse = verseByReference(id, chapter, number, translation.meta.id);
+    const verse = attest(
+      translation.meta.id,
+      verseByReference(id, chapter, number, translation.meta.id),
+    );
     verses.push({
       id: verse.id,
       number: verse.verse,
@@ -409,7 +440,9 @@ app.get("/passages", (context) => {
   }
   for (const segment of parsed.segments) {
     for (let sequence = segment.start.sequence; sequence <= segment.end.sequence; sequence += 1) {
-      verses.push(serializePassageVerse(verseAt(sequence, translation.meta.id)));
+      verses.push(
+        serializePassageVerse(verseAt(sequence, translation.meta.id), translation.meta.id),
+      );
     }
   }
 
@@ -475,7 +508,7 @@ app.get("/search", (context) => {
     offset,
     truncated: outcome.truncated,
     translation: translation.meta,
-    results: outcome.hits.map((hit) => ({
+    results: outcome.hits.map((hit) => attest(translation.meta.id, hit)).map((hit) => ({
       id: hit.id,
       book: hit.book,
       chapter: hit.chapter,

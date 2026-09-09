@@ -77,14 +77,14 @@ export class ParseError extends Error {
  * the caller knows it.
  * ------------------------------------------------------------------ */
 
-export function chapterCount(bookId: string, translation: string = DEFAULT_TRANSLATION): number {
+export function chapterCount(bookId: string, translation: string): number {
   return versificationOf(translation).verseCounts[bookId]?.length ?? 0;
 }
 
 export function verseCount(
   bookId: string,
   chapter: number,
-  translation: string = DEFAULT_TRANSLATION,
+  translation: string,
 ): number {
   return versificationOf(translation).verseCounts[bookId]?.[chapter - 1] ?? 0;
 }
@@ -93,7 +93,7 @@ export function sequenceOf(
   bookId: string,
   chapter: number,
   verse: number,
-  translation: string = DEFAULT_TRANSLATION,
+  translation: string,
 ): number {
   const { bookStart, chapterOffset } = versificationOf(translation);
   const start = bookStart.get(bookId);
@@ -223,7 +223,7 @@ function displayName(bookId: string): string {
   return BOOKS.get(bookId)?.name ?? bookId;
 }
 
-function resolveBook(raw: string, translation: string = DEFAULT_TRANSLATION): string {
+function resolveBook(raw: string, translation: string): string {
   const name = normalizeBookName(raw);
   if (name === "") throw new ParseError("No book name was given");
 
@@ -274,7 +274,7 @@ function resolveBook(raw: string, translation: string = DEFAULT_TRANSLATION): st
 function ensureAvailable(
   bookId: string,
   raw: string,
-  translation: string = DEFAULT_TRANSLATION,
+  translation: string,
 ): string {
   // Whether a book is available is a fact about *this edition*, not about the
   // canon. `dataAvailability` in canon.ts is derived globally — every
@@ -613,7 +613,7 @@ export function parseReference(
 function validateChapter(
   book: string,
   chapter: number,
-  translation: string = DEFAULT_TRANSLATION,
+  translation: string,
 ): void {
   const total = chapterCount(book, translation);
   if (chapter < 1 || chapter > total) {
@@ -628,7 +628,7 @@ function validateVerse(
   book: string,
   chapter: number,
   verse: number,
-  translation: string = DEFAULT_TRANSLATION,
+  translation: string,
 ): void {
   const total = verseCount(book, chapter, translation);
   if (verse < 1 || verse > total) {
@@ -689,7 +689,7 @@ function formatReference(
  */
 export function locate(
   sequence: number,
-  translation: string = DEFAULT_TRANSLATION,
+  translation: string,
 ): { book: string; chapter: number; verse: number } {
   if (!Number.isInteger(sequence) || sequence < 1) {
     throw new ParseError(`Verse sequence out of range: ${sequence}`, "out_of_range");

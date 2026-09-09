@@ -71,24 +71,24 @@ describe("archaic morphology", () => {
 
 describe("search recall through morphology", () => {
   test("a lemma reaches its irregular forms in the text", () => {
-    const speak = search("speak", 100, 0);
+    const speak = search("speak", 100, 0, "asv");
     expect(speak.hits.some((hit) => /spake/i.test(hit.text))).toBe(true);
 
-    const say = search("say", 100, 0);
+    const say = search("say", 100, 0, "asv");
     expect(say.hits.some((hit) => /said|saith/i.test(hit.text))).toBe(true);
   });
 
   test("recall exceeds what prefix matching alone could reach", () => {
     // "spake" shares no prefix with "speak", so this total is only reachable
     // through the irregular table.
-    expect(search("speak", 1, 0).total).toBeGreaterThan(1000);
-    expect(search("say", 1, 0).total).toBeGreaterThan(5000);
+    expect(search("speak", 1, 0, "asv").total).toBeGreaterThan(1000);
+    expect(search("say", 1, 0, "asv").total).toBeGreaterThan(5000);
   });
 });
 
 describe("AND semantics", () => {
   test("every term must appear, so totals mean what they say", () => {
-    const outcome = search("good shepherd", 20, 0);
+    const outcome = search("good shepherd", 20, 0, "asv");
     expect(outcome.total).toBe(2);
     for (const hit of outcome.hits) {
       expect(hit.text.toLowerCase()).toContain("good");
@@ -97,18 +97,18 @@ describe("AND semantics", () => {
   });
 
   test("one absent word empties the result", () => {
-    expect(search("God zzzznotaword", 10, 0).total).toBe(0);
+    expect(search("God zzzznotaword", 10, 0, "asv").total).toBe(0);
   });
 
   test("finds a verse from a phrase spread across it", () => {
-    expect(search("faith hope love", 5, 0).hits[0]!.id).toBe("1CO.13.13");
-    expect(search("beginning God created", 5, 0).hits[0]!.id).toBe("GEN.1.1");
+    expect(search("faith hope love", 5, 0, "asv").hits[0]!.id).toBe("1CO.13.13");
+    expect(search("beginning God created", 5, 0, "asv").hits[0]!.id).toBe("GEN.1.1");
   });
 
   test("multi-term queries stay exact rather than truncating", () => {
     // "lord" seeds the candidate set and "the" filters it by membership, so no
     // budget cap is reached even though "the" alone would exceed it.
-    const outcome = search("the lord", 10, 0);
+    const outcome = search("the lord", 10, 0, "asv");
     expect(outcome.truncated).toBe(false);
     for (const hit of outcome.hits) {
       expect(hit.text.toLowerCase()).toContain("lord");

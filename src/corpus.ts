@@ -18,7 +18,7 @@ import * as asvMeta from "./data/asv/meta.ts";
 import * as draText from "./data/dra/text.ts";
 import * as draMeta from "./data/dra/meta.ts";
 import { locate, sequenceOf } from "./parser.ts";
-import { DEFAULT_TRANSLATION, UnknownTranslationError } from "./translations.ts";
+import { UnknownTranslationError } from "./translations.ts";
 
 /** Decodes a base36 delta list into absolute values. */
 export function decodeDeltas(encoded: string, expected: number): Int32Array {
@@ -86,7 +86,7 @@ interface Corpus extends EditionModules {
 
 const BUILT = new Map<string, Corpus>();
 
-function corpusFor(translation: string = DEFAULT_TRANSLATION): Corpus {
+function corpusFor(translation: string): Corpus {
   const cached = BUILT.get(translation);
   if (cached !== undefined) return cached;
 
@@ -112,12 +112,12 @@ function corpusFor(translation: string = DEFAULT_TRANSLATION): Corpus {
 /** Which editions have text embedded, as opposed to merely being registered. */
 export const EMBEDDED_TRANSLATIONS: readonly string[] = Object.keys(MODULES);
 
-export function totalVersesOf(translation: string = DEFAULT_TRANSLATION): number {
+export function totalVersesOf(translation: string): number {
   return corpusFor(translation).verseCount;
 }
 
 /** What this edition is and what was published, for identity headers. */
-export function identityOf(translation: string = DEFAULT_TRANSLATION): {
+export function identityOf(translation: string): {
   readonly editionId: string;
   readonly revisionId: string;
   readonly generationId: string;
@@ -131,6 +131,16 @@ export function identityOf(translation: string = DEFAULT_TRANSLATION): {
 }
 
 export interface CorpusVerse {
+  /**
+   * The edition this verse was actually read from.
+   *
+   * Carried so provenance can be checked rather than assumed. Three separate
+   * bugs in this codebase resolved a coordinate against one edition and read
+   * the text from another, and every one returned HTTP 200 with a real verse
+   * in it. A type cannot catch passing the wrong translation, only a missing
+   * one — this field is what lets the response boundary catch the rest.
+   */
+  readonly translation: string;
   readonly id: string;
   readonly book: string;
   readonly chapter: number;
@@ -141,7 +151,7 @@ export interface CorpusVerse {
 }
 
 /** Verse text by global sequence, without materializing any intermediate array. */
-export function textAt(sequence: number, translation: string = DEFAULT_TRANSLATION): string {
+export function textAt(sequence: number, translation: string): string {
   const corpus = corpusFor(translation);
   if (sequence < 1 || sequence > corpus.verseCount) {
     throw new RangeError(`Verse sequence out of range: ${sequence}`);
@@ -151,12 +161,13 @@ export function textAt(sequence: number, translation: string = DEFAULT_TRANSLATI
 
 export function verseAt(
   sequence: number,
-  translation: string = DEFAULT_TRANSLATION,
+  translation: string,
 ): CorpusVerse {
   const corpus = corpusFor(translation);
   const { book, chapter, verse } = locate(sequence, translation);
   const id = `${book}.${chapter}.${verse}`;
   return {
+    translation,
     id,
     book,
     chapter,
@@ -171,7 +182,7 @@ export function verseByReference(
   book: string,
   chapter: number,
   verse: number,
-  translation: string = DEFAULT_TRANSLATION,
+  translation: string,
 ): CorpusVerse {
   return verseAt(sequenceOf(book, chapter, verse, translation), translation);
 }
@@ -180,7 +191,7 @@ export function verseByReference(
 export function descriptiveTitle(
   book: string,
   chapter: number,
-  translation: string = DEFAULT_TRANSLATION,
+  translation: string,
 ): string | null {
   return corpusFor(translation).titles[`${book}.${chapter}`] ?? null;
 }
@@ -192,7 +203,7 @@ export function descriptiveTitle(
 export function subscription(
   book: string,
   chapter: number,
-  translation: string = DEFAULT_TRANSLATION,
+  translation: string,
 ): string | null {
   return corpusFor(translation).subscriptions[`${book}.${chapter}`] ?? null;
 }

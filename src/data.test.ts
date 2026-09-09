@@ -52,7 +52,7 @@ describe("omitted verses", () => {
   test("exactly the 16 known verses are empty", () => {
     const empty: string[] = [];
     for (let sequence = 1; sequence <= TOTAL_VERSES; sequence += 1) {
-      if (textAt(sequence) === "") empty.push(verseAt(sequence).id);
+      if (textAt(sequence, "asv") === "") empty.push(verseAt(sequence, "asv").id);
     }
     expect(empty.sort()).toEqual([...EXPECTED_EMPTY_VERSES].sort());
   });
@@ -77,8 +77,8 @@ describe("descriptive titles", () => {
   });
 
   test("Psalm 23 has one and Psalm 1 does not", () => {
-    expect(descriptiveTitle("PSA", 23)).toBe("A Psalm of David.");
-    expect(descriptiveTitle("PSA", 1)).toBeNull();
+    expect(descriptiveTitle("PSA", 23, "asv")).toBe("A Psalm of David.");
+    expect(descriptiveTitle("PSA", 1, "asv")).toBeNull();
   });
 
   /**
@@ -89,16 +89,16 @@ describe("descriptive titles", () => {
    */
   test("Habakkuk 3's closing line is a subscription, not a heading", () => {
     expect(Object.keys(SUBSCRIPTIONS)).toEqual([...EXPECTED_SUBSCRIPTIONS]);
-    expect(descriptiveTitle("HAB", 3)).toBeNull();
-    expect(subscription("HAB", 3)).toBe("For the Chief Musician, on my stringed instruments.");
+    expect(descriptiveTitle("HAB", 3, "asv")).toBeNull();
+    expect(subscription("HAB", 3, "asv")).toBe("For the Chief Musician, on my stringed instruments.");
   });
 
   test("the subscription never leaks into the surrounding verses", () => {
-    const last = verseByReference("HAB", 3, 19);
+    const last = verseByReference("HAB", 3, 19, "asv");
     expect(last.text).toContain("walk upon my high places");
     expect(last.text).not.toContain("Chief Musician");
     // Habakkuk 3's own superscription is a numbered verse in the ASV.
-    expect(verseByReference("HAB", 3, 1).text).toBe(
+    expect(verseByReference("HAB", 3, 1, "asv").text).toBe(
       "A prayer of Habakkuk the prophet, set to Shigionoth.",
     );
   });
@@ -110,7 +110,7 @@ describe("descriptive titles", () => {
 
 describe("editorial brackets", () => {
   test("Selah markers are closed", () => {
-    const psalm3 = verseByReference("PSA", 3, 2).text;
+    const psalm3 = verseByReference("PSA", 3, 2, "asv").text;
     expect(psalm3).toContain("[Selah]");
     expect(psalm3).not.toMatch(/\[Selah$/);
   });
@@ -122,17 +122,17 @@ describe("editorial brackets", () => {
    * verse would destroy real textual apparatus to tidy a markup artifact.
    */
   test("the disputed passage keeps its bracket across 13 verses", () => {
-    expect(verseByReference("JHN", 7, 53).text.startsWith("[")).toBe(true);
-    expect(verseByReference("JHN", 8, 11).text.endsWith("]")).toBe(true);
+    expect(verseByReference("JHN", 7, 53, "asv").text.startsWith("[")).toBe(true);
+    expect(verseByReference("JHN", 8, 11, "asv").text.endsWith("]")).toBe(true);
   });
 
   test("no other verse has an unbalanced bracket", () => {
     const unbalanced: string[] = [];
     for (let sequence = 1; sequence <= TOTAL_VERSES; sequence += 1) {
-      const text = textAt(sequence);
+      const text = textAt(sequence, "asv");
       const opens = (text.match(/\[/g) ?? []).length;
       const closes = (text.match(/\]/g) ?? []).length;
-      if (opens !== closes) unbalanced.push(verseAt(sequence).id);
+      if (opens !== closes) unbalanced.push(verseAt(sequence, "asv").id);
     }
     expect(unbalanced).toEqual(["JHN.7.53", "JHN.8.11"]);
   });
@@ -141,8 +141,8 @@ describe("editorial brackets", () => {
 describe("sequence integrity", () => {
   test("round-trips every book boundary", () => {
     for (const bookId of PROTESTANT_ORDER) {
-      const sequence = sequenceOf(bookId, 1, 1);
-      const located = locate(sequence);
+      const sequence = sequenceOf(bookId, 1, 1, "asv");
+      const located = locate(sequence, "asv");
       expect(located.book).toBe(bookId);
       expect(located.chapter).toBe(1);
       expect(located.verse).toBe(1);
@@ -156,8 +156,8 @@ describe("sequence integrity", () => {
       const chapters = VERSE_COUNTS[bookId]!;
       for (let chapter = 1; chapter <= chapters.length; chapter += 1) {
         for (const verse of [1, chapters[chapter - 1]!]) {
-          const sequence = sequenceOf(bookId, chapter, verse);
-          expect(locate(sequence)).toEqual({ book: bookId, chapter, verse });
+          const sequence = sequenceOf(bookId, chapter, verse, "asv");
+          expect(locate(sequence, "asv")).toEqual({ book: bookId, chapter, verse });
         }
       }
     }
@@ -165,59 +165,59 @@ describe("sequence integrity", () => {
 
   test("round-trips a sample across the whole range", () => {
     for (let sequence = 1; sequence <= TOTAL_VERSES; sequence += 97) {
-      const verse = verseAt(sequence);
-      expect(sequenceOf(verse.book, verse.chapter, verse.verse)).toBe(sequence);
+      const verse = verseAt(sequence, "asv");
+      expect(sequenceOf(verse.book, verse.chapter, verse.verse, "asv")).toBe(sequence);
     }
   });
 
   test("known verses land where they should", () => {
-    expect(verseAt(1).id).toBe("GEN.1.1");
-    expect(verseAt(TOTAL_VERSES).id).toBe("REV.22.21");
-    expect(verseByReference("JHN", 3, 16).text).toContain("For God so loved the world");
-    expect(verseByReference("PSA", 23, 1).text).toBe("Jehovah is my shepherd; I shall not want.");
+    expect(verseAt(1, "asv").id).toBe("GEN.1.1");
+    expect(verseAt(TOTAL_VERSES, "asv").id).toBe("REV.22.21");
+    expect(verseByReference("JHN", 3, 16, "asv").text).toContain("For God so loved the world");
+    expect(verseByReference("PSA", 23, 1, "asv").text).toBe("Jehovah is my shepherd; I shall not want.");
   });
 
   test("preserves the divine name", () => {
-    expect(verseByReference("EXO", 6, 3).text).toContain("Jehovah");
+    expect(verseByReference("EXO", 6, 3, "asv").text).toContain("Jehovah");
   });
 });
 
 describe("search index", () => {
   test('returns results for "God", the mandated smoke test', () => {
-    const outcome = search("God", 20, 0);
+    const outcome = search("God", 20, 0, "asv");
     expect(outcome.total).toBeGreaterThan(0);
     expect(outcome.hits.length).toBe(20);
   });
 
   test("ranks the expected verse first for a distinctive phrase", () => {
-    expect(search("good shepherd", 5, 0).hits[0]!.id).toBe("JHN.10.11");
-    expect(search("beginning God created", 5, 0).hits[0]!.id).toBe("GEN.1.1");
+    expect(search("good shepherd", 5, 0, "asv").hits[0]!.id).toBe("JHN.10.11");
+    expect(search("beginning God created", 5, 0, "asv").hits[0]!.id).toBe("GEN.1.1");
   });
 
   test("supports prefix matching on the final token", () => {
-    expect(search("believeth", 5, 0).total).toBeGreaterThan(0);
-    expect(search("believet", 5, 0).total).toBeGreaterThan(0);
+    expect(search("believeth", 5, 0, "asv").total).toBeGreaterThan(0);
+    expect(search("believet", 5, 0, "asv").total).toBeGreaterThan(0);
   });
 
   test("paginates without overlap", () => {
-    const first = search("love", 5, 0).hits.map((hit) => hit.id);
-    const second = search("love", 5, 5).hits.map((hit) => hit.id);
+    const first = search("love", 5, 0, "asv").hits.map((hit) => hit.id);
+    const second = search("love", 5, 5, "asv").hits.map((hit) => hit.id);
     expect(first).toHaveLength(5);
     expect(new Set([...first, ...second]).size).toBe(10);
   });
 
   test("caps work on an extremely common term and says so", () => {
-    const outcome = search("the", 10, 0);
+    const outcome = search("the", 10, 0, "asv");
     expect(outcome.truncated).toBe(true);
     expect(outcome.hits.length).toBe(10);
   });
 
   test("returns nothing for a term absent from the ASV", () => {
-    expect(search("zzzznotaword", 10, 0).total).toBe(0);
+    expect(search("zzzznotaword", 10, 0, "asv").total).toBe(0);
   });
 
   test("every hit's text actually contains the term", () => {
-    for (const hit of search("shepherd", 20, 0).hits) {
+    for (const hit of search("shepherd", 20, 0, "asv").hits) {
       expect(hit.text.toLowerCase()).toContain("shepherd");
     }
   });
@@ -232,7 +232,7 @@ describe("total means what it says", () => {
    * it says. See the comment on MAX_POSTINGS_SCANNED.
    */
   test("a query of common words is counted exactly, not truncated", () => {
-    const outcome = search("the and of that unto shall", 20, 0);
+    const outcome = search("the and of that unto shall", 20, 0, "asv");
     expect(outcome.truncated).toBe(false);
     expect(outcome.total).toBe(345);
   });
@@ -245,16 +245,16 @@ describe("total means what it says", () => {
     // Note this cannot assert that each hit literally contains each term —
     // terms match through morphological families, so a hit for "shall" may
     // carry "shalt". That is the feature, and morphology.test.ts covers it.
-    const outcome = search("the and of that unto shall", 1_000, 0);
+    const outcome = search("the and of that unto shall", 1_000, 0, "asv");
     expect(outcome.hits).toHaveLength(outcome.total);
     expect(new Set(outcome.hits.map((hit) => hit.id)).size).toBe(outcome.total);
   });
 
   test("only a bare function word still truncates", () => {
     // The safety valve is meant to be unreachable by ordinary queries.
-    expect(search("the", 5, 0).truncated).toBe(true);
+    expect(search("the", 5, 0, "asv").truncated).toBe(true);
     for (const query of ["and", "God", "good shepherd", "the and", "Jehovah"]) {
-      expect(search(query, 5, 0).truncated).toBe(false);
+      expect(search(query, 5, 0, "asv").truncated).toBe(false);
     }
   });
 });

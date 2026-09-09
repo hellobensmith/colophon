@@ -328,3 +328,61 @@ describe("search covers both editions, each from its own index", () => {
     }
   });
 });
+
+describe("a verse cannot be served under another edition's name", () => {
+  /**
+   * The structural answer to the only bug this codebase kept producing.
+   *
+   * Three times while growing a second edition, a coordinate was resolved
+   * against one Bible and the text read from another. Every one returned HTTP
+   * 200 with a real, well-formed, correctly numbered verse in it — Esther 14:1
+   * as Job 3:5, a search hit whose text lacked the word that matched it. No
+   * status code or schema can see that, so verses carry the edition they were
+   * read from and the response boundary checks it.
+   *
+   * Removing either the argument or the check makes these fail: both were
+   * verified by reintroducing the original bugs and watching the guard fire on
+   * JOB.3.5 and EZK.40.10 by name.
+   */
+  test("every verse records which edition it came from", async () => {
+    const { verseAt } = await import("./corpus.ts");
+    for (const id of TRANSLATION_IDS) {
+      expect(verseAt(1, id).translation).toBe(id);
+      expect(verseAt(100, id).translation).toBe(id);
+    }
+  });
+
+  test("the boundary refuses a verse from the wrong edition", async () => {
+    const { attest } = await import("./index.ts");
+    const { verseAt } = await import("./corpus.ts");
+
+    const asvVerse = verseAt(1, "asv");
+    expect(() => attest("asv", asvVerse)).not.toThrow();
+    expect(() => attest("dra", asvVerse)).toThrow(/Provenance mismatch/);
+    expect(() => attest("dra", asvVerse)).toThrow(/read from asv/);
+  });
+
+  test("and it is a 500, because the fault is ours and not the caller's", async () => {
+    // A caller cannot cause this. If it ever fires in production it means the
+    // code mixed two editions, which is a bug here rather than bad input.
+    const { attest } = await import("./index.ts");
+    const { verseAt } = await import("./corpus.ts");
+    expect(() => attest("dra", verseAt(1, "asv"))).toThrow(Error);
+  });
+
+  test("every route's verses match the translation it names", async () => {
+    for (const id of TRANSLATION_IDS) {
+      const passage = await passage_(id);
+      expect(passage.body.translation.id).toBe(id);
+
+      const chapter = await get(`/books/GEN/chapters/1?translation=${id}`);
+      expect(chapter.status).toBe(200);
+      expect(chapter.body.verses.length).toBeGreaterThan(0);
+
+      const search = await get(`/search?q=beginning&limit=5&translation=${id}`);
+      expect(search.body.translation.id).toBe(id);
+    }
+  });
+});
+
+const passage_ = (id: string) => passage("Genesis 1:1", id);

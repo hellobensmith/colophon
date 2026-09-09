@@ -43,22 +43,22 @@ describe("parser entry points forward their translation", () => {
   // were accepted and then ignored.
   test("chapterCount", () => {
     expect(() => chapterCount("GEN", BOGUS)).toThrow(UnknownTranslationError);
-    expect(chapterCount("GEN")).toBe(50);
+    expect(chapterCount("GEN", "asv")).toBe(50);
   });
 
   test("verseCount", () => {
     expect(() => verseCount("GEN", 1, BOGUS)).toThrow(UnknownTranslationError);
-    expect(verseCount("GEN", 1)).toBe(31);
+    expect(verseCount("GEN", 1, "asv")).toBe(31);
   });
 
   test("sequenceOf", () => {
     expect(() => sequenceOf("GEN", 1, 1, BOGUS)).toThrow(UnknownTranslationError);
-    expect(sequenceOf("GEN", 1, 1)).toBe(1);
+    expect(sequenceOf("GEN", 1, 1, "asv")).toBe(1);
   });
 
   test("locate", () => {
     expect(() => locate(1, BOGUS)).toThrow(UnknownTranslationError);
-    expect(locate(31102)).toEqual({ book: "REV", chapter: 22, verse: 21 });
+    expect(locate(31102, "asv")).toEqual({ book: "REV", chapter: 22, verse: 21 });
   });
 });
 

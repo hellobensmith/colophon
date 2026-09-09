@@ -12,7 +12,7 @@ import { parseReference, ParseError } from "./parser.ts";
 import { verseByReference, descriptiveTitle } from "./corpus.ts";
 
 const englishText = (psalm: number, verse: number): string =>
-  verseByReference("PSA", psalm, verse).text;
+  verseByReference("PSA", psalm, verse, "asv").text;
 
 describe("Greek psalm numbering", () => {
   test("resolves the citations that motivate the feature", () => {
@@ -139,7 +139,7 @@ describe("numbering through the reference parser", () => {
     const result = parseReference("Psalm 9:1", { numbering: "greek" });
     expect(result.includeTitle).toBe(true);
     expect(result.titleChapter).toBe(9);
-    expect(descriptiveTitle("PSA", 9)).toBeString();
+    expect(descriptiveTitle("PSA", 9, "asv")).toBeString();
   });
 
   test("a title-only reference still names its chapter", () => {

@@ -193,13 +193,13 @@ describe("Hebrew numbering", () => {
 
 describe("sequence numbering", () => {
   test("runs from Genesis 1:1 to Revelation 22:21", () => {
-    expect(sequenceOf("GEN", 1, 1)).toBe(1);
-    expect(sequenceOf("REV", 22, 21)).toBe(31102);
+    expect(sequenceOf("GEN", 1, 1, "asv")).toBe(1);
+    expect(sequenceOf("REV", 22, 21, "asv")).toBe(31102);
   });
 
   test("is contiguous across a book boundary", () => {
     // Malachi is the last Old Testament book; Matthew follows it.
-    expect(sequenceOf("MAT", 1, 1) - sequenceOf("MAL", 4, 6)).toBe(1);
+    expect(sequenceOf("MAT", 1, 1, "asv") - sequenceOf("MAL", 4, 6, "asv")).toBe(1);
   });
 });
 
