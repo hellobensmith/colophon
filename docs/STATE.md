@@ -23,8 +23,9 @@ Git history is the record of what changed.
 <https://colophon.hellobensmith.workers.dev> — the ASV 1901 (31,102 verses) and
 the Douay-Rheims (35,811 verses, 73 books), both embedded in a Cloudflare
 Worker with no database. Reference parsing, three canon traditions, Hebrew and
-Greek psalm numbering, a demo page at `/`. Search covers the ASV only, and
-returns 501 for anything else rather than answering from the wrong index.
+Greek psalm numbering, a demo page at `/`. Search covers both editions, each
+from its own index, and returns 501 for a translation with none rather than
+answering from the wrong index.
 
 **A conformance suite.** `conformance/` — asks seven public Scripture APIs the
 same semantic questions and writes a capability matrix. Published for

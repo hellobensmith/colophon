@@ -372,18 +372,15 @@ provision, and nothing to configure — the data is in the bundle.
 
 ## Limitations
 
-**One translation — but not because of the size limit.** A second fits with room
-to spare. Measured 7 September 2026: the Douay-Rheims adds 1.39 MB of text and
-offsets plus roughly 0.73 MB of index, putting two translations near 4.01 MB
-against this plan's 10 MB. No startup rebuild is needed, and none should be
-attempted — the DRA's index took 282 ms to build locally, which is past the
-1,000 ms startup budget once production's roughly fourfold slowdown is applied.
-
-So the single translation here is a matter of the work not being done yet, not
-a wall. What a second one actually needs is plumbing: verse counts are per
-edition, and 32 of the 66 books the ASV and the Douay-Rheims share disagree
-about them — Esther and Daniel by whole chapters — so a verse coordinate is
-only meaningful paired with the translation it was resolved against.
+**Two translations, on the paid plan.** The ASV and the Douay-Rheims are both
+embedded and searchable, each from its own index — `?translation=dra` works
+on every endpoint. Together they run about 4.05 MB gzip, comfortably under
+the 10 MB limit a paid Worker gets, but over the 3 MB a free account gets: this
+deployment needs the paid tier. A third translation is plumbing, not a wall —
+verse counts are per edition, and 32 of the 66 books the ASV and the
+Douay-Rheims share disagree about them — Esther and Daniel by whole chapters —
+so a verse coordinate is only ever meaningful paired with the translation it
+was resolved against.
 
 **Updating means redeploying, and then waiting.** Fine for a text fixed in 1901,
 but worth stating plainly: a deploy does not purge the cache in front of the
