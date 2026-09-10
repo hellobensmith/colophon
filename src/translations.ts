@@ -116,9 +116,12 @@ const DRA: Translation = {
   editionId: "dra",
   verseCounts: DRA_VERSE_COUNTS,
   order: EDITION_ORDER.dra,
-  // The Greek division is what this edition prints. Converting onto it needs
-  // the inverse of what psalms.ts encodes, which is real work and not done.
-  psalmSchemes: [],
+  // The Greek division is what this edition prints, so addressing it in
+  // Greek numbering is a bounds check against its own verse counts, not a
+  // conversion — see fromGreekOntoDra in psalms.ts. Hebrew numbering is not
+  // supported: that would need inverting the ASV's Hebrew-to-Greek table
+  // onto DRA's native numbers, a separate, harder problem.
+  psalmSchemes: ["greek"],
 };
 
 /**

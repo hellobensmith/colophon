@@ -96,26 +96,56 @@ element roles, nothing added to `ELEMENT_ROLES`:
 - Source `https://ebible.org/Scriptures/engDRA_usfx.zip`, 2,946,666 bytes,
   sha256 `9dfbc526d699e9e461d0a8419c60dd12390e8618af7ac3e97083ae5e53e2ed29`
 
-**The Greek psalm numbering is confirmed, textually and not just arithmetically.**
-Greek 50 opens "Have mercy on me, O God" — the Miserere, Hebrew 51. Every split
-sums exactly: Greek 114+115 = 19 = Hebrew 116; Greek 146+147 = 20 = Hebrew 147;
-Greek 113 = 26 = Hebrew 114+115. `src/psalms.ts` is externally confirmed.
+**The Greek psalm numbering is confirmed against the Clementine Vulgate
+itself, not reconstructed from the ASV or DRA against each other.** Ben
+supplied a local copy of the Clementine Vulgate source text
+(vulsearch.sourceforge.net's edition), and every claim below was checked
+against it directly — cross-checked live against drbo.org and
+bible.catholicgallery.org — 9 September 2026.
 
-Correcting what this file said before: not "all 150 agreed within 1". Of the 146
-directly comparable psalms, 82 match exactly, 59 read one higher because the
-superscription is verse 1, and **5 read two higher because their superscription
-runs to two lines** — Greek 50:1-2 is the visible example. Nothing is
-unaccounted for.
+Every split still sums exactly: Greek 114+115 = 19 = Hebrew 116;
+Greek 146+147 = 20 = Hebrew 147; Greek 113 = 26 = Hebrew 114+115.
 
-**Flagged 9 September 2026, not corrected**: three independent attempts this
-session to recompute this breakdown (a quick per-chapter count diff, a
-DRA-text read restricted to candidate two-line titles, and an adversarial
-review's own recount) each produced a *different* 82/59/5-shaped total, and
-none checked against a primary source outside this codebase — every attempt
-reasoned from the ASV and DRA against each other. The number above stays
-unchanged because no attempt earned the confidence to replace it with another
-unverified one. Before touching it again: check a real Vulgate edition
-directly. See the parked psalm-numbering investigation below.
+**Title structure, all 150 psalms**: 84 carry no separate Vulgate title
+verse (folded into or absent from the first content verse), 62 carry one,
+and 4 — Psalms 50, 51, 53, 59, each a long historical superscription — carry
+two, splitting across two Vulgate verses instead of one. Naively borrowing
+the corresponding Hebrew psalm's own superscription status — what
+`src/psalms.ts` did until 9 September — gets 98 of the 150 right and 52
+wrong (48 where the Vulgate has no title verse the Hebrew's does, the same 4
+two-line psalms, and Greek 145, where the Vulgate titles a psalm the Hebrew
+leaves untitled).
+
+**Separately, nine psalms have a genuine interior content split or merge,
+unrelated to titles** — the Vulgate's own verse divisions disagreeing with
+the ASV's mid-psalm, not just at the title. Found by comparing this
+edition's own verse divisions against the Vulgate directly (a sliding-window
+check matching each ASV verse's distinctive vocabulary against nearby DRA
+verses at the same Vulgate coordinate), then read and mapped verse-by-verse
+against the Latin text: **12** (Hebrew 13 splits its own verse 2, then
+merges verses 5-6 — the psalm behind the original motivating bug),
+**52** (Hebrew 53 splits verse 1, otherwise clean), **71** (Hebrew 72 merges
+verses 1-2), **99** (Hebrew 100 — the Vulgate adds a superscription the
+Hebrew never had, then also merges verses 1-2), **108** (Hebrew 109 merges
+verses 1-2), **145** (Hebrew 146 — another added superscription, then merges
+parts of verses 1-3). One (**129**, Hebrew 130) has a tangled middle
+redistributing verses 4-7 across a different count, refused as a block
+rather than guessed. Two (**43**, **55**) rest on the sliding-window
+alignment alone rather than a full manual re-reading — a method that matched
+hand-verification exactly on every one of the six psalms above it was
+cross-checked against.
+
+A genuine split is answerable honestly: every Vulgate position in it names
+the same, complete ASV verse. A genuine merge is not — returning either ASV
+verse would silently omit real content — so those specific Vulgate verses
+are refused outright (`PsalmNumberingError`, naming the Hebrew verses
+involved) rather than guessed. This closes the exact failure this project
+exists to prevent: a coordinate resolving against one edition's numbering
+and silently reading text from another. `?numbering=greek&translation=dra`
+answers directly now too — the DRA already prints this division natively
+(confirmed against the Vulgate: 145 of 150 psalms match exactly; the five
+that don't are a minor, real edition variance, not a bug), so it needs no
+conversion at all, just a bounds check against its own verse counts.
 
 **32 of the 66 shared books differ in versification**, and not only the odd ones.
 EST is 10 chapters in the ASV and 16 in the DRA; DAN is 12 and 14. But Genesis,
@@ -264,7 +294,7 @@ Re-litigating these wastes time. Each was measured, not chosen by taste.
 | **No database** | The corpus is 31,102 rows fixed in 1901: no writes, no concurrency, no growth. Embedding measured 1.94 MB gzip with zero I/O, and 6-18 ms median CPU (re-measured 7 September; the 4 ms recorded originally was a quieter sample). A DB adds a round trip to one region to solve a problem we do not have. |
 | **Embedded, not R2** | Same measurement, and it survives the second translation: the limit is 10 MB, not the 3 MB assumed here, so two translations fit at ~4.01 MB with room for about four more. R2 is not needed for Phase 1. |
 | **Search stays in v1** | A build brief we evaluated forbids it. We measured the alternative and kept it; the morphology work is the most-used feature. |
-| **Greek/Hebrew psalm numbering synthesized** | That brief forbids synthesizing versification the source does not carry. We built it anyway, verified it as a bijection over 2,577 positions, and then confirmed it externally against Douay-Rheims. |
+| **Greek/Hebrew psalm numbering synthesized** | That brief forbids synthesizing versification the source does not carry. We built it anyway — not as a clean bijection, since the Vulgate genuinely splits and merges content the ASV divides differently. Verified against the Clementine Vulgate directly: 2,526 addressable Greek coordinates onto the ASV, 2,506 distinct positions (four two-line titles and two clean splits each collapse two coordinates onto one), 14 verses explicitly refused rather than guessed at nine psalms with a genuine interior split or merge. |
 | **Platform cache, not the Cache API** | `[cache] enabled` in `wrangler.toml` serves hits *without running the Worker*: re-measured 7 September at 1 MISS and 7 HITs across 8 identical requests, one invocation. **Wrangler warns `Unexpected fields found in top-level field: "cache"` and honours the key anyway.** That warning is not evidence the key is dead — acting on it the same day switched caching off and took 8 identical requests to 8 invocations. `bun run check:platform` now counts invocations, so this fails loudly instead of silently. **A deploy does not purge this cache** — that was documented backwards and measured false on 7 September; verse data is now `max-age=86400` rather than a year of `immutable`. A deploy invalidates it automatically, which is what makes `immutable` safe. The in-Worker Hono middleware was removed as redundant. |
 | **Exact-form search ranking rejected** | Built and measured. It fixed the four homographs but pushed `spake`, `saith` and `went` out of the top 20 entirely, and roughly doubled CPU. `spake` outnumbers `speak` in this translation, so the trade loses. |
 | **Query cost cap rejected** | Built to refuse expensive searches, priced from the shipped document frequencies, and removed the same day. The costliest query the index can express prices at 135,841; "and it came to pass in the days of the king" prices at 99,444. No threshold separates them, and it was refusing `?q=the`, which the spec documents. What it guarded against is a one-time posting-cache warm per isolate, not a repeatable amplification. Deduplicating terms and capping at twelve is the whole fix. |
@@ -432,19 +462,20 @@ which text it is holding. Repo, Worker, package and docs all renamed; the old
 4. **Verse-data caching is capped at a day.** Raising it needs either a real
    purge, which workers.dev has no zone for, or the generation id in the URL.
    Deliberate, and Ben can overrule it — see the trap below.
-5. **DRA support in `src/psalms.ts` — parked as an investigation, 9 September
-   2026.** A design to hand-build a 146-row offset table so DRA verse numbers
-   agree with `greekVerseCount()` (an ASV-derived model) went to review, which
-   found DRA likely already prints native Vulgate numbering — the table would
-   have forced DRA to agree with the ASV's reconstruction of it rather than
-   trusting DRA's own numbers, the project's core failure mode one level up.
-   Two concrete bugs surfaced in the process, in the ASV's own *already
-   shipped* `numbering=greek`: `fromGreek(4, 10)` throws though Vulgate 4:10
-   is real, and `fromGreek(12, 7)` returns a real ASV verse from the wrong
-   coordinate under HTTP 200. Fix those first. Then check DRA's own verse
-   structure against a real Vulgate text before designing anything — see the
-   flagged note above. `numbering=greek&translation=dra` stays a 501 until
-   then; that refusal is honest, an unverified table would not be.
+5. ~~DRA support in `src/psalms.ts`~~ **Resolved 9 September 2026.** Not a
+   hand-built offset table forcing DRA to agree with an ASV reconstruction —
+   that design was reviewed and rejected for exactly that reason. Ben
+   supplied a local Clementine Vulgate source text, which settled it
+   properly: the DRA already prints native Vulgate numbering (145 of 150
+   psalms match the source exactly; five are a minor, real edition variance,
+   not a bug), so `fromGreekOntoDra` is a bounds check against the DRA's own
+   verse counts, not a conversion. `?numbering=greek&translation=dra`
+   answers directly now. Separately, the ASV's own `numbering=greek` had a
+   real bug (`fromGreek(12, 7)` silently returned the wrong verse under
+   200) — nine psalms turned out to have a genuine interior content split or
+   merge the title-only model couldn't represent; see the title-structure
+   note above for the full breakdown and `src/psalms.ts`'s
+   `irregularGreekParts` for the per-psalm detail.
 
 ---
 

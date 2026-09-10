@@ -162,9 +162,9 @@ describe("STATE.md's prose numbers match the corpus", () => {
 
   test("the Greek/Hebrew psalm splits it cites actually sum", () => {
     const claims: [string, number, number][] = [
-      ["Greek 114+115", greekVerseCount(114) + greekVerseCount(115), numberedVerses(116)],
-      ["Greek 146+147", greekVerseCount(146) + greekVerseCount(147), numberedVerses(147)],
-      ["Greek 113", greekVerseCount(113), numberedVerses(114) + numberedVerses(115)],
+      ["Greek 114+115", greekVerseCount(114, "asv") + greekVerseCount(115, "asv"), numberedVerses(116)],
+      ["Greek 146+147", greekVerseCount(146, "asv") + greekVerseCount(147, "asv"), numberedVerses(147)],
+      ["Greek 113", greekVerseCount(113, "asv"), numberedVerses(114) + numberedVerses(115)],
     ];
     for (const [label, left, right] of claims) {
       expect(left).toBe(right);
@@ -186,12 +186,17 @@ describe("STATE.md's stated sums add up", () => {
     expect(n(m![2]!) + n(m![3]!) + n(m![4]!)).toBe(n(m![1]!));
   });
 
-  test("the psalm comparison tallies to the stated total", () => {
-    const total = Number(STATE.match(/Of the (\d+)\s*\n?directly comparable psalms/)![1]!);
-    const exact = Number(STATE.match(/psalms, (\d+) match exactly/)![1]!);
-    const one = Number(STATE.match(/(\d+) read one higher/)![1]!);
-    const two = Number(STATE.match(/\*\*(\d+) read two higher/)![1]!);
-    expect(exact + one + two).toBe(total);
+  test("the psalm title-line distribution tallies to 150", () => {
+    const none = Number(STATE.match(/(\d+)\s+carry\s+no\s+separate\s+Vulgate\s+title\s+verse/)![1]!);
+    const one = Number(STATE.match(/(\d+)\s+carry\s+one/)![1]!);
+    const two = Number(STATE.match(/and\s+(\d+)\s*—\s*Psalms 50, 51, 53, 59/)![1]!);
+    expect(none + one + two).toBe(150);
+  });
+
+  test("the naive-borrowing correction tallies to 150", () => {
+    const right = Number(STATE.match(/gets\s+(\d+)\s+of\s+the\s+150\s+right/)![1]!);
+    const wrong = Number(STATE.match(/and\s+(\d+)\s+wrong/)![1]!);
+    expect(right + wrong).toBe(150);
   });
 });
 

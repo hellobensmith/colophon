@@ -433,9 +433,24 @@ function toInteger(text: string, label: string): number {
  * in the ASV's English text. A Greek psalm may span two Hebrew ones, so the
  * answer carries its own psalm number rather than assuming the input's.
  */
-function resolvePsalm(numbering: Numbering, psalm: number, verse: number): PsalmPosition {
+function resolvePsalm(
+  numbering: Numbering,
+  psalm: number,
+  verse: number,
+  translation: string,
+): PsalmPosition {
   try {
-    return numbering === "greek" ? fromGreek(psalm, verse) : fromHebrew(psalm, verse);
+    if (numbering === "greek") return fromGreek(psalm, verse, translation);
+    // fromHebrew holds the ASV's own relationship between Hebrew numbering
+    // and its text; there is no general version of it to apply to another
+    // edition, so a non-ASV target is refused here rather than silently
+    // resolved against the ASV.
+    if (translation !== DEFAULT_TRANSLATION) {
+      throw new PsalmNumberingError(
+        `Hebrew numbering is not implemented for translation "${translation}"`,
+      );
+    }
+    return fromHebrew(psalm, verse);
   } catch (error) {
     if (error instanceof PsalmNumberingError) {
       throw new ParseError(error.message, "out_of_range");
@@ -445,9 +460,15 @@ function resolvePsalm(numbering: Numbering, psalm: number, verse: number): Psalm
 }
 
 /** Verses a psalm has under the requested numbering, superscription included. */
-function psalmVerseCount(numbering: Numbering, psalm: number): number {
+function psalmVerseCount(numbering: Numbering, psalm: number, translation: string): number {
   try {
-    return numbering === "greek" ? greekVerseCount(psalm) : numberedVerses(psalm);
+    if (numbering === "greek") return greekVerseCount(psalm, translation);
+    if (translation !== DEFAULT_TRANSLATION) {
+      throw new PsalmNumberingError(
+        `Hebrew numbering is not implemented for translation "${translation}"`,
+      );
+    }
+    return numberedVerses(psalm);
   } catch (error) {
     if (error instanceof PsalmNumberingError) {
       throw new ParseError(error.message, "out_of_range");
@@ -528,11 +549,12 @@ export function parseReference(
     let endVerse: number;
 
     if (numbering !== "english") {
-      const start = resolvePsalm(numbering, startChapter, raw.startVerse ?? 1);
+      const start = resolvePsalm(numbering, startChapter, raw.startVerse ?? 1, translation);
       const end = resolvePsalm(
         numbering,
         endChapter,
-        raw.endVerse ?? psalmVerseCount(numbering, endChapter),
+        raw.endVerse ?? psalmVerseCount(numbering, endChapter, translation),
+        translation,
       );
 
       if (start.kind === "title") {

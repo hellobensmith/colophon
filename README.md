@@ -333,7 +333,7 @@ The divergence is not a constant offset. Two psalms merge, two split:
 and split psalms:
 
 ```bash
-curl 'localhost:8787/passages?ref=Psalm+50:2&numbering=greek'
+curl 'localhost:8787/passages?ref=Psalm+50:3&numbering=greek'
 # Psalm 51:1 — "Have mercy upon me, O God"
 
 curl 'localhost:8787/passages?ref=Psalm+115:1&numbering=greek'
@@ -343,9 +343,20 @@ curl 'localhost:8787/passages?ref=Psalm+9:21-22&numbering=greek'
 # crosses from Hebrew 9:20 into Hebrew 10:1 inside a single Greek psalm
 ```
 
-The mapping is verified as a bijection: all 150 Greek psalms resolve to exactly
-2,577 distinct positions — the Psalter's 2,461 verses plus its 116
-superscriptions, each reached once and only once.
+Every mapping is checked against the Clementine Vulgate's own text, not
+reconstructed from this translation alone: 2,526 Greek coordinates resolve
+onto 2,506 distinct positions in this translation (four two-line
+superscriptions and two verse splits each address the same position twice,
+which is why distinct positions run lower than addressable coordinates). Nine
+psalms — 12, 43, 52, 55, 71, 99, 108, 129, 145 — have a genuine content split
+or merge inside them where the Vulgate's own verse divisions disagree with
+this translation's, not just at the title; a handful of specific verses in
+those psalms are refused rather than guessed, since returning either half of
+a merged verse would silently omit real content.
+
+`?translation=dra&numbering=greek` needs no conversion at all: the
+Douay-Rheims already prints the Vulgate's own division, so addressing it in
+Greek numbering is a bounds check against its own verse counts.
 
 The divine name is preserved as the ASV printed it: **Jehovah**, 6,887 times,
 where most English Bibles substitute "the LORD".

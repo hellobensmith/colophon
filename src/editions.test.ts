@@ -259,18 +259,30 @@ describe("psalm numbering is a fact about the edition", () => {
     expect(dra.body.verses[0].id).toBe("PSA.50.1");
   });
 
-  test("an unconvertible numbering is refused, not answered emptily", async () => {
-    for (const scheme of ["hebrew", "greek"]) {
-      const response = await get(
-        `/passages?ref=Psalm+51:1&translation=dra&numbering=${scheme}`,
-      );
-      expect(response.status).toBe(501);
-      expect(response.body.error).toBe("not_implemented");
-      expect(response.body.detail).toContain("Douay-Rheims");
-      expect(response.body.detail).toContain(scheme);
-      // Never a 200 carrying nothing.
-      expect(response.body.verses).toBeUndefined();
-    }
+  test("Hebrew numbering is still refused for the DRA", async () => {
+    const response = await get(`/passages?ref=Psalm+51:1&translation=dra&numbering=hebrew`);
+    expect(response.status).toBe(501);
+    expect(response.body.error).toBe("not_implemented");
+    expect(response.body.detail).toContain("Douay-Rheims");
+    expect(response.body.detail).toContain("hebrew");
+    // Never a 200 carrying nothing.
+    expect(response.body.verses).toBeUndefined();
+  });
+
+  test("Greek numbering on the DRA is identity, not refused", async () => {
+    const response = await get(`/passages?ref=Psalm+50:1&translation=dra&numbering=greek`);
+    expect(response.status).toBe(200);
+    expect(response.body.verses[0].id).toBe("PSA.50.1");
+  });
+
+  test("a Vulgate merge the DRA can address but the ASV can't is refused, not guessed", async () => {
+    // Greek 99 merges Hebrew 100:1-2 in the ASV's own text; the DRA has no
+    // such gap, since it never borrows the ASV's structure.
+    const asv = await get(`/passages?ref=Psalm+99:2&translation=asv&numbering=greek`);
+    expect(asv.status).toBeGreaterThanOrEqual(400);
+    expect(asv.body.verses).toBeUndefined();
+    const dra = await get(`/passages?ref=Psalm+99:2&translation=dra&numbering=greek`);
+    expect(dra.status).toBe(200);
   });
 
   test("the ASV still converts both ways", async () => {
