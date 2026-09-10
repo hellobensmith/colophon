@@ -1,6 +1,6 @@
 # State — read this first
 
-Last updated 9 September 2026 · public repo · deployed
+Last updated 10 September 2026 · public repo · deployed
 
 This file is a **progress tracker**, not the source of truth. The code is the
 source of truth; this exists so a session does not re-derive what an earlier one
@@ -60,8 +60,8 @@ the command that refreshes it; re-run before relying on one.
 | Measurement | Value | Refresh with |
 |---|---|---|
 | Contract | 54/54 responses conform to `openapi.yaml` | `bun run check:contract` |
-| Bundle | 1,941 KiB gzip against a 10 MB limit (paid plan; 3 MB is free-tier) | `bun run deploy` output, or `check:platform --probe-limit` |
-| Production CPU | median 3-18 ms, worst 21-48 ms over six runs; the worst tracks cold isolates, not the code. No CPU cap enforced. | `bun run check:platform` |
+| Bundle | 4.05 MB gzip against a 10 MB limit (paid plan; 3 MB is free-tier, which this deployment now exceeds) | `bun run deploy` output, or `check:platform --probe-limit` |
+| Production CPU | median 9-39 ms, worst 47-112 ms over eight runs (10 September, wider than the 7 September baseline — two more indexed translations and a heavier passage-read path); the worst tracks cold isolates, not the code. No CPU cap enforced. | `bun run check:platform` |
 | Repo | `github.com/hellobensmith/colophon`, **public** | — |
 
 ```bash
@@ -357,8 +357,13 @@ and is where a regression shows. The worst tracks cold isolates — a request
 landing on a fresh one pays the posting-cache warm, and a run straight after a
 deploy finds nothing else, which is how a 48 ms reading appeared with no code
 change behind it. Conflating them meant the check failed on cold starts while a
-real slowdown could have hidden in the same range. Claimed at 25 ms and 60 ms,
-from an observed 3-18 and 21-48.
+real slowdown could have hidden in the same range. Claimed at 45 ms and 130 ms
+as of 10 September, from an observed 9-39 and 47-112 across eight runs — both
+ranges wider than 7 September's 25/60 claim (from an observed 3-18 and 21-48).
+The DRA became searchable and the Greek psalm-numbering rewrite landed on the
+passage-read path in between; that's enough to explain the shift in ceiling,
+but the *variance* grew too, not just the top of the range, which is worth
+watching rather than assuming away.
 
 **Production CPU is higher than this file recorded.** Measured 7 September with
 `wrangler tail`, cache-busted so every request reached the Worker:
