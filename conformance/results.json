@@ -1,5 +1,5 @@
 {
-  "base": "https://bible-api.hellobensmith.workers.dev",
+  "base": "https://colophon.hellobensmith.workers.dev",
   "adapters": [
     "ours",
     "bible-api.com",
