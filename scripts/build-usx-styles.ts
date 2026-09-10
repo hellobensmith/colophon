@@ -114,7 +114,15 @@ for (const [name, values] of ordered) {
 
   for (const style of values) {
     if (name === "Para.para.style.enum") {
-      roles.set(style, PARA_HEADINGS.includes(style) ? "metadata" : "paragraph");
+      // Same precedence rule as every other branch below: a style already
+      // classified by a more specific group (BookIntroduction, BookHeaders...)
+      // keeps that role. `ip` and `rem` are members of both `Para` and
+      // `BookIntroduction.para.style.enum` — unconditionally overwriting here
+      // silently turned a correct `metadata` into `paragraph`, which would
+      // fold a translator's remark straight into verse text.
+      if (!roles.has(style)) {
+        roles.set(style, PARA_HEADINGS.includes(style) ? "metadata" : "paragraph");
+      }
       continue;
     }
     const role = GROUP_ROLES[name];
@@ -126,6 +134,21 @@ for (const [name, values] of ordered) {
     if (!roles.has(style)) roles.set(style, role);
   }
 }
+
+/**
+ * Generic typographic emphasis the schema lists under both `Char` (role
+ * `transparent`) and `FootnoteChar`/`CrossReferenceChar` (role `footnote`) —
+ * because these styles may also appear *inside* a footnote or cross
+ * reference, not because their role changes with where they sit. Unlike
+ * `xt`, which is genuinely apparatus wherever it occurs, these are plain
+ * verse-text formatting; the actual containing `<note>` (tracked by
+ * `usx.ts`'s own `noteDepth`) is what decides routing. `GROUP_PRECEDENCE`
+ * ranks the footnote groups first, so without this override every one of
+ * these locks to `footnote` and silently strips bold/italic/emphasis out of
+ * ordinary verse text into notes.
+ */
+const ALWAYS_TRANSPARENT: readonly string[] = ["bd", "bdit", "em", "it", "sc"];
+for (const style of ALWAYS_TRANSPARENT) roles.set(style, "transparent");
 
 if (unresolved.length > 0) {
   console.error(
