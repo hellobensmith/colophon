@@ -239,7 +239,18 @@ export function parseUsx(xml: string): UsfmDocument {
       selfClosing: match[4] === "/",
     };
 
-    if (tag.name === "usx" || tag.name === "optbreak" || tag.name === "ms" || tag.name === "ref") {
+    if (
+      tag.name === "usx" || tag.name === "optbreak" || tag.name === "ms" || tag.name === "ref" ||
+      // <table> and <periph> never carry text of their own in the schema —
+      // only structural children — so bypassing their own tags is inert.
+      // <cell> does carry real prose (a genealogy name), but its `style`
+      // is a schema pattern (t[hc][rc]?\d+), not an enum, so there is
+      // nothing to classify it against; bypassing it here is not a
+      // compromise, since the tokenizer is flat — its text still reaches
+      // the open verse if there is one, or drops via the existing "drop"
+      // sink if there isn't, either way fully accounted for in the ledger.
+      tag.name === "table" || tag.name === "cell" || tag.name === "periph"
+    ) {
       continue;
     }
     if (!ELEMENTS.has(tag.name)) {
@@ -306,7 +317,7 @@ export function parseUsx(xml: string): UsfmDocument {
         if (current !== null) current.text += balanced;
         selah = null;
       }
-      if (opened.name === "note" || opened.role === "footnote") noteDepth -= 1;
+      if (opened.role === "footnote") noteDepth -= 1;
       else if (opened.role === "metadata" || opened.role === "footnote-reference") {
         metadataDepth -= 1;
       }
@@ -316,19 +327,28 @@ export function parseUsx(xml: string): UsfmDocument {
       continue;
     }
 
-    const role = USX_STYLE_ROLES.get(style);
+    // figure's `style` attribute is unconstrained free text in the schema —
+    // never enumerable — so, like \fig in usfm.ts, it is always dropped as
+    // apparatus rather than classified from a style value that carries no
+    // routing meaning. Its caption can appear mid-verse, so (unlike table/
+    // cell/periph above) it needs the active "metadata" depth-counter
+    // treatment rather than a bare bypass, or the caption would leak into
+    // the verse being built.
+    const role = tag.name === "figure" ? "metadata" : USX_STYLE_ROLES.get(style);
     if (role === undefined) throw new UnknownMarkerError(style || tag.name, book);
 
     if (tag.name === "para" && style === "d") {
       settlePending(false);
       finish();
       pending = { chapter, text: "", length: 0 };
-    } else if (tag.name === "note") {
-      noteDepth += 1;
-      dropKey = "note";
     } else if (tag.name === "char" && style === "qs" && sinkNow() === "verse") {
       selah = "";
     } else {
+      // <note> is not always a footnote — style="x" is a cross-reference,
+      // apparatus rather than prose, and USX_STYLE_ROLES already resolves
+      // it to "metadata" like everything else in that family. Dispatching
+      // on role here (rather than short-circuiting on tag.name === "note")
+      // is what lets that classification actually take effect.
       switch (role) {
         case "metadata":
           settlePending(false);
@@ -337,6 +357,7 @@ export function parseUsx(xml: string): UsfmDocument {
           break;
         case "footnote":
           noteDepth += 1;
+          dropKey = style;
           break;
         case "footnote-reference":
           metadataDepth += 1;
@@ -354,7 +375,7 @@ export function parseUsx(xml: string): UsfmDocument {
 
     if (!tag.selfClosing) {
       stack.push({ name: tag.name, style, role });
-    } else if (tag.name === "note" || role === "footnote") {
+    } else if (role === "footnote") {
       noteDepth -= 1;
     } else if (role === "metadata" || role === "footnote-reference") {
       metadataDepth -= 1;

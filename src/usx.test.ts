@@ -132,6 +132,26 @@ describe("each role class routes its text somewhere", () => {
     );
     expect(doc.verses[0]!.text).toBe("Done. [Selah]");
   });
+
+  test("a cross-reference note is dropped as apparatus, not filed into the verse note", () => {
+    // <note> is not always a footnote — style="x" is a cross-reference, and
+    // USX_STYLE_ROLES already resolves it to "metadata". A special case that
+    // treated every <note> as a footnote used to bypass that classification
+    // entirely.
+    const doc = parseUsx(
+      chapter(1, `<para style="p"><verse number="1" style="v" sid="GEN 1:1"/>In the beginning ` +
+        `<note caller="+" style="x"><char style="xo">1.1: </char><char style="xt">Gen 2:1.</char></note>` +
+        `God created the heaven.<verse eid="GEN 1:1"/></para>`),
+    );
+    expect(doc.verses[0]!.text).toBe("In the beginning God created the heaven.");
+    expect(doc.verses[0]!.note).toBeNull();
+    // Keyed by whichever cross-reference sub-style (xo/xt) actually carried
+    // the text, not by "x" itself — the outer <note style="x"> has no text
+    // of its own here, it's all inside its <char> children.
+    expect(doc.ledger.dropped.get("xo")).toBeGreaterThan(0);
+    expect(doc.ledger.dropped.get("xt")).toBeGreaterThan(0);
+    expect(sumLedger(doc.ledger)).toBe(doc.ledger.sourceCharacters);
+  });
 });
 
 describe("two style-table misclassifications, fixed", () => {
@@ -183,6 +203,49 @@ describe("it refuses what it cannot classify", () => {
     expect(() =>
       parseUsx(chapter(1, `<para style="zzz">Text</para>`)),
     ).toThrow(UnknownMarkerError);
+  });
+});
+
+describe("table, figure and periph no longer throw", () => {
+  // <cell>'s style is a schema pattern (t[hc][rc]?\d+), not an enum;
+  // <figure>'s is unconstrained free text; <table> and <periph> have no
+  // style at all. None of that can populate USX_STYLE_ROLES, so all four
+  // used to throw UnknownMarkerError on their opening tag.
+  test("a table outside any verse is dropped, not thrown on", () => {
+    const doc = parseUsx(
+      chapter(1, `<table><row style="tr"><cell style="th1" align="start">Header</cell></row></table>` +
+        `<para style="p"><verse number="1" style="v" sid="GEN 1:1"/>Real text.<verse eid="GEN 1:1"/></para>`),
+    );
+    expect(doc.verses).toHaveLength(1);
+    expect(doc.verses[0]!.text).toBe("Real text.");
+    expect(sumLedger(doc.ledger)).toBe(doc.ledger.sourceCharacters);
+  });
+
+  test("a cell's text reaches the verse open inside its row", () => {
+    // <row>'s content model is verse milestones and cells as siblings — a
+    // genealogy rendered as a table has the verse open around the cells.
+    const doc = parseUsx(
+      chapter(1, `<table><row style="tr"><verse number="1" style="v" sid="GEN 1:1"/>` +
+        `<cell style="th1" align="start">Reuben</cell><verse eid="GEN 1:1"/></row></table>`),
+    );
+    expect(doc.verses[0]!.text).toBe("Reuben");
+  });
+
+  test("a figure's caption is dropped, and the verse it interrupts is not truncated", () => {
+    const doc = parseUsx(
+      chapter(1, `<para style="p"><verse number="1" style="v" sid="GEN 1:1"/>text before ` +
+        `<figure style="an9" file="img.png" size="col">A caption.</figure> text after` +
+        `<verse eid="GEN 1:1"/></para>`),
+    );
+    expect(doc.verses[0]!.text).toBe("text before text after");
+    expect(sumLedger(doc.ledger)).toBe(doc.ledger.sourceCharacters);
+  });
+
+  test("a peripheral document does not throw", () => {
+    expect(() =>
+      parseUsx(`<usx version="3.0"><periph id="x-XXA" alt="Alternate Titles">` +
+        `<para style="mt1">Title</para></periph></usx>`),
+    ).not.toThrow();
   });
 });
 
