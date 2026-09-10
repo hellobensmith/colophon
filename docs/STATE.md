@@ -286,6 +286,54 @@ ceiling, and Phase 1 should not wait on it.
 
 ---
 
+## Where Phase 2 stands — bring your own text
+
+More already existed than this file said. Three commits from 8 September —
+`src/usfm.ts`, `src/usx.ts`, `src/format.ts`, local-bundle reading in
+`scripts/sources.ts` — shipped a USFM reader proven byte-identical to the
+USFX-ingested ASV, a USX reader tested against schema-derived fixtures, and
+content-sniffing format detection, none of it mentioned here until now.
+
+**10 September 2026: both readers now carry the same coverage-ledger rigor
+USFX has, and `scripts/build-data.ts` dispatches by detected format.**
+`parseUsfm`/`parseUsx` used to return a bare `dropped` map; they now return
+the same `ScriptureDocument` (`src/document.ts`) every reader produces,
+carrying a full six-bucket `CoverageLedger` that balances against
+`sourceCharacters` — checked against the real ASV-as-USFM bundle
+(15,703,039 source characters), not just fixtures. The largest single gap
+closed was the `\w...|strong=...\w*` attribute tail: ~10.6M characters,
+two-thirds of the whole corpus, previously unaccounted for anywhere.
+`src/ingest.ts`'s `parseSource(text, format?)` is the pure dispatch seam —
+`detectFormat()` when no format is given — that `build-data.ts` now calls
+instead of hardcoding `parseUsfx`.
+
+Two independent bugs surfaced and were fixed along the way, both in
+`scripts/build-usx-styles.ts`'s schema-derived role table:
+`bd`/`bdit`/`em`/`it`/`sc` were locked to `footnote` instead of `transparent`
+(present in both `Char.char.style.enum` and `FootnoteChar.char.style.enum`,
+and the generator's precedence rules picked the wrong one), which would have
+silently routed bold/italic verse text into notes for any USX source using
+them; separately, `ip`/`rem` were double-classified via an unconditional
+overwrite in the generator's `Para.para.style.enum` branch (the only branch
+without the "first, more specific role wins" guard every other branch has),
+which would have folded a translator's remark into verse text.
+
+**Deliberately not done yet**: `CorpusExpectations.dropped` (see
+`src/expectations/asv.ts`) is authored against USFX's element vocabulary —
+`languageCode`, `id`, `h`, `toc`, `fr` — and a USFM-derived read of the same
+ASV text produces 16 dropped keys, several with no USFX counterpart at all
+(`chapter-number`, `front-matter`, `word-attribute`...), because USFM
+carries book/chapter/verse identifiers as consumed text tokens where XML
+carries them as attributes. `validateCorpus` requires exact key-set parity,
+so `bun run build:data --translation asv --source <a-usfm-path>` fails at
+that check today — not a bug, a real design question not yet answered
+(per-format expectations? a looser check for non-primary formats?) and
+deliberately scoped out of the ledger work rather than improvised under it.
+Nothing currently exercises this path — no script or test calls `build:data`
+against a real `--source` end to end — so the gap is real but inert.
+
+---
+
 ## Decisions already made, and why
 
 Re-litigating these wastes time. Each was measured, not chosen by taste.
