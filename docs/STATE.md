@@ -416,6 +416,16 @@ the six external APIs do no reference parsing at all. Full matrix in
   curl reports as MISS,HIT,HIT… invokes the Worker every time from Bun, with no
   `cf-cache-status` header at all. Any cache measurement written in Bun must
   shell out to curl, or it will report caching as broken while it works.
+- **Eight separate `curl` processes to the same URL can land on eight different
+  Cloudflare datacenters.** Each opens its own connection, and anycast routes
+  each independently — one run measured ATL, MIA, DFW, BOS and back to MIA
+  across eight requests to the same cache key. Cloudflare's tiered cache does
+  not promise a fresh entry is instantly visible across datacenters, so
+  `check:platform`'s edge-caching check read 1-3 invocations instead of the
+  expected 1, intermittently, for a working cache. Fixed by sending all eight
+  through one `curl` invocation instead of eight, so the connection — and the
+  datacenter — is reused. Confirmed by `cf-ray`'s datacenter suffix: eight
+  requests on one connection all read the same one, and MISS,HIT×7 every time.
 - **ebible.org truncates large downloads.** `scripts/download.ts` resumes with
   Range requests and keeps partial bytes; reading the whole body at once loses
   them and the retry can never progress.

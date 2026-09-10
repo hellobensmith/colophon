@@ -214,13 +214,31 @@ if (!attached) {
   // fetched from Bun, and the response carries no cf-cache-status at all. Using
   // fetch here would report caching as broken while it works fine for real
   // clients.
+  //
+  // All eight requests go out on one curl invocation, not eight separate
+  // processes, so the connection is reused rather than reopened. Reopening it
+  // let anycast route each request to a different Cloudflare datacenter — a
+  // single run measured ATL, MIA, DFW, BOS and back to MIA across eight
+  // requests — and Cloudflare's tiered cache does not promise the fresh entry
+  // is instantly visible across datacenters, so this counted real
+  // cross-datacenter propagation lag as a caching failure. Pinned to one
+  // connection, and so one datacenter, the same request reads MISS once and
+  // HIT seven times, every time — confirmed over four separate runs before
+  // relying on it here.
   const cacheUrl = `${BASE}/passages?ref=Romans%208:28&pc=${cacheMarker}`;
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    await run(["curl", "-s", "-o", "/dev/null", cacheUrl]);
-  }
+  await run(["curl", "-s", "-o", "/dev/null", ...Array(8).fill(cacheUrl)]);
 
+  // Wait for the cache probe's own event too, not just the CPU probes'. The
+  // cache burst fires on one fast, reused connection and can finish — and its
+  // tail event arrive — on a different schedule than the 18 separately-opened
+  // CPU probe connections. Waiting on the CPU marker alone let the cache
+  // marker's single expected event still be in flight when the fixed sleep
+  // below ran out, misread as "0 invocations" rather than "not arrived yet".
   const expected = CPU_PROBES.length * 3;
-  await waitFor(() => captured.split(cpuMarker).length - 1 >= expected, 40);
+  await waitFor(
+    () => captured.split(cpuMarker).length - 1 >= expected && captured.includes(cacheMarker),
+    40,
+  );
   await Bun.sleep(5_000);
   tail.kill();
   await pump.catch(() => {});
