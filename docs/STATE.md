@@ -332,6 +332,34 @@ deliberately scoped out of the ledger work rather than improvised under it.
 Nothing currently exercises this path — no script or test calls `build:data`
 against a real `--source` end to end — so the gap is real but inert.
 
+**Three more bugs found and fixed the same way, 10 September 2026.** A USFM
+inline cross-reference (`\x...\x*`) mid-verse used to truncate everything
+after it — the generic `"metadata"` role finished the verse unconditionally,
+correct for boundary markers (`\s`, `\mt`...) but wrong for the four markers
+(`x`, `va`, `vp`, `fig`) that carry their own closer and can appear
+mid-verse, exactly like `\f` already handles correctly. A new `"discard"`
+role fixes it. Separately, USX filed every `<note>` as a footnote regardless
+of `style`, so a cross-reference's text landed in `verse.note` instead of
+being dropped as apparatus — `USX_STYLE_ROLES` already classified it
+correctly, the `<note>` special case just never let that classification
+run. And `<table>`/`<figure>`/`<periph>` threw immediately on their opening
+tag: their `style` attributes are a schema pattern, free text, or absent
+entirely, none of which a static role table can represent — `<table>`/
+`<cell>`/`<periph>` are now bypassed (their content is inert or already
+reaches whatever verse is open, either way fully accounted for in the
+ledger), `<figure>`'s caption is forced to the `"metadata"` role since it
+can appear mid-verse and needs active dropping, not a bare bypass. All
+three were real but latent: the ASV/DRA contain none of the triggering
+markers, in any format.
+
+**`PARSER_VERSION` (`src/identity.ts`) was not bumped** for either the two
+USX misclassification fixes or these three — re-verified each time that
+neither shipped edition (`asv`, `dra`) builds from anything but `parseUsfx`,
+so nothing published is affected. Revisit the moment either format's
+`--source` override is actually used to build a shipped edition — two
+manifests both carrying the same `PARSER_VERSION` could otherwise have come
+from different, non-equivalent code.
+
 ---
 
 ## Decisions already made, and why
@@ -540,6 +568,18 @@ which text it is holding. Repo, Worker, package and docs all renamed; the old
    merge the title-only model couldn't represent; see the title-structure
    note above for the full breakdown and `src/psalms.ts`'s
    `irregularGreekParts` for the per-psalm detail.
+6. **`CorpusExpectations.dropped` has no per-format variant.** See "Where
+   Phase 2 stands" above — a USFM-derived read of the ASV produces 16
+   dropped keys with no USFX counterpart, and `validateCorpus` requires
+   exact key-set parity. Not exercised by anything shipped today, so
+   inert but real.
+7. **`PARSER_VERSION` was not bumped for the USX misclassification fixes,
+   or for the three USFM/USX bugs fixed 10 September** (inline apparatus
+   truncation, cross-references filed as notes, unparseable table/figure/
+   periph). See "Where Phase 2 stands" above: neither reader is in the
+   `asv`/`dra` build path today, so their output has no effect on anything
+   published. Revisit the moment either format's `--source` override is
+   actually used to build a shipped edition.
 
 ---
 
