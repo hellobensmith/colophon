@@ -360,6 +360,16 @@ so nothing published is affected. Revisit the moment either format's
 manifests both carrying the same `PARSER_VERSION` could otherwise have come
 from different, non-equivalent code.
 
+**Two more stale-doc fixes, same day.** `conformance/results.json`'s `base`
+field still named the pre-rename domain (`bible-api.hellobensmith...`) —
+`conformance/run.ts` itself has defaulted to the current one since the
+rename, the published file was just never regenerated; fixed, and it
+changes no measured verdict, only the provenance label. Separately,
+`openapi.yaml` documented `?translation=` on `/books`, `/passages` and
+`/search` but not on `/books/{id}` or `/books/{id}/chapters/{num}`, even
+though every route accepts it — fixed, embedded copy regenerated with
+`bun run build:openapi`.
+
 ---
 
 ## Decisions already made, and why
