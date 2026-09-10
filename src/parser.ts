@@ -6,7 +6,7 @@
  * versification, so "John 3:99" is rejected with the actual chapter length.
  */
 
-import { BOOKS } from "./canon.ts";
+import { BOOKS, type DataAvailability } from "./canon.ts";
 import { DEFAULT_TRANSLATION, resolveTranslation, versificationOf } from "./translations.ts";
 import {
   fromGreek,
@@ -79,6 +79,15 @@ export class ParseError extends Error {
 
 export function chapterCount(bookId: string, translation: string): number {
   return versificationOf(translation).verseCounts[bookId]?.length ?? 0;
+}
+
+/**
+ * Whether this translation actually has bookId's text, not just its canon
+ * metadata. Presence in the translation's own verse-count table is the
+ * authority — never the global, ASV-shaped classification in canon.ts.
+ */
+export function dataAvailabilityOf(bookId: string, translation: string): DataAvailability {
+  return chapterCount(bookId, translation) > 0 ? "full" : "metadata_only";
 }
 
 export function verseCount(
@@ -277,11 +286,12 @@ function ensureAvailable(
   translation: string,
 ): string {
   // Whether a book is available is a fact about *this edition*, not about the
-  // canon. `dataAvailability` in canon.ts is derived globally — every
-  // deuterocanonical book is marked metadata_only there — so consulting it
+  // canon. `isDeuterocanon` in canon.ts is a global classification — every
+  // deuterocanonical book is deuterocanonical everywhere — so consulting it
   // first would refuse Tobit for the Douay-Rheims, which prints all fourteen
-  // chapters of it. The edition's own verse counts are the authority; the canon
-  // metadata only explains *why* something is missing.
+  // chapters of it. The edition's own verse counts are the authority (see
+  // `dataAvailabilityOf`); the canon metadata only explains *why* something
+  // is missing.
   if (versificationOf(translation).verseCounts[bookId] !== undefined) {
     return bookId;
   }

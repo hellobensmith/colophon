@@ -75,9 +75,7 @@ describe("docs/STATE.md matches the code it describes", () => {
   });
 
   test("books carrying metadata only", () => {
-    const count = [...BOOKS.values()].filter(
-      (book) => book.dataAvailability === "metadata_only",
-    ).length;
+    const count = [...BOOKS.values()].filter((book) => book.isDeuterocanon).length;
     expect(claimed("Books with metadata only")).toBe(String(count));
   });
 

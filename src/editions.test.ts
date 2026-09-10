@@ -60,7 +60,7 @@ describe("the same reference returns each edition's own words", () => {
 describe("books one edition has and the other does not", () => {
   // The ASV marks all ten deuterocanonical books metadata_only; the DRA prints
   // seven of them. Availability is a fact about the edition, so canon.ts's
-  // global dataAvailability cannot be the gate — consulting it first refused
+  // global isDeuterocanon cannot be the gate — consulting it first refused
   // Tobit for an edition that contains fourteen chapters of it.
   test("Tobit is served by the DRA and refused by the ASV", async () => {
     const dra = await passage("Tobit 1:1", "dra");
@@ -70,6 +70,32 @@ describe("books one edition has and the other does not", () => {
     const asv = await passage("Tobit 1:1", "asv");
     expect(asv.status).toBe(404);
     expect(asv.body.detail).toContain("American Standard Version");
+  });
+
+  test("data_availability on /books/:id follows the requested edition", async () => {
+    const dra = await get("/books/TOB?translation=dra");
+    expect(dra.status).toBe(200);
+    expect(dra.body.data_availability).toBe("full");
+
+    const asv = await get("/books/TOB?translation=asv");
+    expect(asv.status).toBe(200);
+    expect(asv.body.data_availability).toBe("metadata_only");
+  });
+
+  test("/books/:id/chapters/:num follows the requested edition too", async () => {
+    const dra = await get("/books/TOB/chapters/1?translation=dra");
+    expect(dra.status).toBe(200);
+
+    const asv = await get("/books/TOB/chapters/1?translation=asv");
+    expect(asv.status).toBe(404);
+    expect(asv.body.detail).toContain("American Standard Version");
+  });
+
+  test("data_availability on /books?tradition= also follows the requested edition", async () => {
+    const dra = await get("/books?tradition=catholic&translation=dra");
+    expect(dra.status).toBe(200);
+    const tobit = dra.body.books.find((book: any) => book.id === "TOB");
+    expect(tobit.data_availability).toBe("full");
   });
 
   test("1 Esdras is in neither, and says so per edition", async () => {

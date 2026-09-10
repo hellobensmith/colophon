@@ -44,7 +44,6 @@ export interface BookMeta {
   readonly approximateDate: string;
   readonly genre: string;
   readonly isDeuterocanon: boolean;
-  readonly dataAvailability: DataAvailability;
 }
 
 /**
@@ -161,7 +160,6 @@ function toMeta(row: BookRow): BookMeta {
     approximateDate: row[4],
     genre: row[5],
     isDeuterocanon,
-    dataAvailability: isDeuterocanon ? "metadata_only" : "full",
   };
 }
 

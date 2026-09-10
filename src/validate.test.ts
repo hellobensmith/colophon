@@ -219,7 +219,7 @@ describe("the two expectation sets describe two different texts", () => {
   test("the DRA supplies seven of the ten books the ASV only describes", async () => {
     const { DRA } = await import("./expectations/dra.ts");
     const metadataOnly = [...BOOKS.values()]
-      .filter((book) => book.dataAvailability === "metadata_only")
+      .filter((book) => book.isDeuterocanon)
       .map((book) => book.id);
     const supplied = metadataOnly.filter((id) => DRA.books.has(id));
     expect(metadataOnly.length).toBe(10);

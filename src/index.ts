@@ -21,6 +21,7 @@ import {
   parseReference,
   chapterCount,
   verseCount,
+  dataAvailabilityOf,
   type ParseErrorKind,
 } from "./parser.ts";
 import {
@@ -196,7 +197,7 @@ function serializeBook(bookId: string, translation: string = DEFAULT_TRANSLATION
     author: meta.author,
     genre: meta.genre,
     approximate_date: meta.approximateDate,
-    data_availability: meta.dataAvailability,
+    data_availability: dataAvailabilityOf(meta.id, translation),
     canons: canonPositions(meta.id),
   };
 }
@@ -322,7 +323,7 @@ app.get("/books/:id/chapters/:num", (context) => {
   const id = context.req.param("id").toUpperCase();
   const meta = BOOKS.get(id);
   if (meta === undefined) throw notFound(`No book with id "${context.req.param("id")}"`);
-  if (meta.dataAvailability === "metadata_only") {
+  if (dataAvailabilityOf(id, translation.meta.id) === "metadata_only") {
     throw notFound(
       `${meta.name} is not present in the ${translation.meta.name}; only its canon metadata is available`,
     );
