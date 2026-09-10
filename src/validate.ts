@@ -20,7 +20,8 @@
  *   the first case and correct in the second.
  */
 
-import type { UsfxDocument } from "./usfx.ts";
+import type { ScriptureDocument } from "./document.ts";
+import { sumBucket, sumLedger } from "./document.ts";
 import { EDITION_ORDER, type EditionId } from "./canon.ts";
 
 /**
@@ -73,7 +74,7 @@ export class ValidationError extends Error {
 
 /** Throws ValidationError listing every discrepancy, rather than the first. */
 export function validateCorpus(
-  doc: UsfxDocument,
+  doc: ScriptureDocument,
   expected: CorpusExpectations,
 ): void {
   const failures: string[] = [];
@@ -208,15 +209,7 @@ export function validateCorpus(
   // dropped somewhere. Text moving to the wrong destination shifts two buckets;
   // text vanishing breaks the sum.
   const ledger = doc.ledger;
-  const sum = (bucket: ReadonlyMap<string, number>): number =>
-    [...bucket.values()].reduce((total, n) => total + n, 0);
-  const accounted =
-    sum(ledger.toVerses) +
-    sum(ledger.toTitles) +
-    sum(ledger.toSubscriptions) +
-    sum(ledger.toNotes) +
-    sum(ledger.dropped) +
-    ledger.unattributed;
+  const accounted = sumLedger(ledger);
   if (accounted !== ledger.sourceCharacters) {
     failures.push(
       `coverage: ${ledger.sourceCharacters} source characters but ${accounted} accounted for ` +
@@ -240,13 +233,13 @@ export function validateCorpus(
   // edition has anything to route. The Douay-Rheims has no superscriptions, no
   // subscriptions and no footnotes at all, so for it an empty bucket is the
   // correct result rather than a broken one.
-  if (expected.titleCount > 0 && sum(ledger.toTitles) === 0) {
+  if (expected.titleCount > 0 && sumBucket(ledger.toTitles) === 0) {
     failures.push("no text reached any chapter superscription");
   }
-  if (expected.subscriptions.length > 0 && sum(ledger.toSubscriptions) === 0) {
+  if (expected.subscriptions.length > 0 && sumBucket(ledger.toSubscriptions) === 0) {
     failures.push("no text reached any chapter subscription");
   }
-  if (expected.expectsNotes && sum(ledger.toNotes) === 0) {
+  if (expected.expectsNotes && sumBucket(ledger.toNotes) === 0) {
     failures.push("no text reached any verse note");
   }
 

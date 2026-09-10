@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { parseUsfx, UnknownElementError } from "./usfx.ts";
+import { sumBucket, sumLedger } from "./document.ts";
 import { EXPECTED_DROPPED } from "./expectations/asv.ts";
 
 /**
@@ -61,19 +62,9 @@ describe("unknown elements stop the build", () => {
 
 describe("the coverage ledger", () => {
   const doc = parseUsfx(SIMPLE);
-  const sum = (bucket: ReadonlyMap<string, number>): number =>
-    [...bucket.values()].reduce((total, n) => total + n, 0);
 
   test("every source character is accounted for", () => {
-    const { ledger } = doc;
-    const accounted =
-      sum(ledger.toVerses) +
-      sum(ledger.toTitles) +
-      sum(ledger.toSubscriptions) +
-      sum(ledger.toNotes) +
-      sum(ledger.dropped) +
-      ledger.unattributed;
-    expect(accounted).toBe(ledger.sourceCharacters);
+    expect(sumLedger(doc.ledger)).toBe(doc.ledger.sourceCharacters);
   });
 
   test("document furniture is dropped rather than silently kept", () => {
@@ -100,8 +91,8 @@ describe("the coverage ledger", () => {
           `<p style="p"><v id="1" bcv="PSA.3.1" />Jehovah.<ve /></p></book>`,
       ),
     );
-    expect(sum(heading.ledger.toTitles)).toBeGreaterThan(0);
-    expect(sum(heading.ledger.toSubscriptions)).toBe(0);
+    expect(sumBucket(heading.ledger.toTitles)).toBeGreaterThan(0);
+    expect(sumBucket(heading.ledger.toSubscriptions)).toBe(0);
 
     const closing = parseUsfx(
       document(
@@ -109,8 +100,8 @@ describe("the coverage ledger", () => {
           `<d style="d">For the Chief Musician.</d></book>`,
       ),
     );
-    expect(sum(closing.ledger.toTitles)).toBe(0);
-    expect(sum(closing.ledger.toSubscriptions)).toBeGreaterThan(0);
+    expect(sumBucket(closing.ledger.toTitles)).toBe(0);
+    expect(sumBucket(closing.ledger.toSubscriptions)).toBeGreaterThan(0);
   });
 });
 

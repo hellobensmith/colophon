@@ -122,61 +122,16 @@ export function closeSelahBracket(text: string): string {
   return opens > closes ? `${text}${"]".repeat(opens - closes)}` : text;
 }
 
-export interface Verse {
-  readonly bcv: string;
-  readonly book: string;
-  readonly chapter: number;
-  readonly verse: number;
-  readonly text: string;
-  /** Footnote prose, present on the 16 verses the ASV omits. */
-  readonly note: string | null;
-}
+import type { ScriptureDocument } from "./document.ts";
+
+export type { Verse, CoverageLedger } from "./document.ts";
 
 /**
- * Where a run of source text ended up, and how much of it there was.
- *
- * Counted rather than listed: the corpus holds about 750,000 text runs, and the
- * invariant worth checking is arithmetic, not a transcript. Every character in
- * the source is either emitted somewhere or dropped somewhere, and the totals
- * have to agree. Text moving to the wrong destination shifts two counters; text
- * vanishing breaks the sum.
+ * `UsfxDocument` is the same shape every reader produces — see
+ * `src/document.ts`. Kept as a named alias here because "a USFX document" is
+ * still the clearer thing to say at most of this file's own call sites.
  */
-export interface CoverageLedger {
-  /** Characters routed to verse bodies, keyed by the element that carried them. */
-  readonly toVerses: ReadonlyMap<string, number>;
-  /** Characters routed to chapter superscriptions. */
-  readonly toTitles: ReadonlyMap<string, number>;
-  /** Characters routed to chapter subscriptions. */
-  readonly toSubscriptions: ReadonlyMap<string, number>;
-  /** Characters routed to verse notes. */
-  readonly toNotes: ReadonlyMap<string, number>;
-  /** Characters deliberately dropped, keyed by element — the lossy inventory. */
-  readonly dropped: ReadonlyMap<string, number>;
-  /** Characters seen outside any destination, e.g. whitespace between books. */
-  readonly unattributed: number;
-  /** Total characters across every text node in the source. */
-  readonly sourceCharacters: number;
-}
-
-export interface UsfxDocument {
-  readonly verses: readonly Verse[];
-  /**
-   * `<d>` titles printed *above* a chapter, keyed by "BOOK.CHAPTER" — the
-   * superscriptions of the Psalms ("A Psalm of David.").
-   */
-  readonly titles: ReadonlyMap<string, string>;
-  /**
-   * `<d>` lines printed *below* a chapter's last verse. USFX marks these with
-   * the same element as a superscription, so position is the only thing that
-   * separates them: Habakkuk 3 closes with "For the Chief Musician, on my
-   * stringed instruments", which belongs after verse 19, not above verse 1.
-   */
-  readonly subscriptions: ReadonlyMap<string, string>;
-  /** Canonical book ids in document order, excluding front/back matter. */
-  readonly books: readonly string[];
-  /** Proof that no source text disappeared silently. See {@link CoverageLedger}. */
-  readonly ledger: CoverageLedger;
-}
+export type UsfxDocument = ScriptureDocument;
 
 const ENTITIES: ReadonlyMap<string, string> = new Map([
   ["lt", "<"],
