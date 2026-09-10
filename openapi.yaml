@@ -130,6 +130,22 @@ paths:
           in: path
           required: true
           schema: { type: string, example: JHN }
+        - name: translation
+          in: query
+          required: false
+          description: |
+            Which translation to read. Defaults to `asv`.
+
+            An unknown id is a 404 naming what this deployment does serve, never
+            a silent fall back to the default: a caller asking for a text this
+            deployment does not hold must be told, not handed a different Bible.
+
+            Verse coordinates belong to a translation, not to the canon. Editions
+            disagree about versification — of the 66 books the ASV and the
+            Douay-Rheims share, 32 differ, Esther and Daniel by whole chapters —
+            so a reference is only meaningful paired with the translation it was
+            resolved against.
+          schema: { type: string, default: asv, example: asv }
       responses:
         "200":
           description: Book metadata.
@@ -150,6 +166,22 @@ paths:
           in: path
           required: true
           schema: { type: integer, minimum: 1, example: 23 }
+        - name: translation
+          in: query
+          required: false
+          description: |
+            Which translation to read. Defaults to `asv`.
+
+            An unknown id is a 404 naming what this deployment does serve, never
+            a silent fall back to the default: a caller asking for a text this
+            deployment does not hold must be told, not handed a different Bible.
+
+            Verse coordinates belong to a translation, not to the canon. Editions
+            disagree about versification — of the 66 books the ASV and the
+            Douay-Rheims share, 32 differ, Esther and Daniel by whole chapters —
+            so a reference is only meaningful paired with the translation it was
+            resolved against.
+          schema: { type: string, default: asv, example: asv }
       responses:
         "200":
           description: Every verse of the chapter.
