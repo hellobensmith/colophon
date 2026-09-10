@@ -148,6 +148,52 @@ describe("the coverage ledger", () => {
   });
 });
 
+describe("inline apparatus does not truncate the verse it interrupts", () => {
+  // \x, \va, \vp and \fig each close with their own \* — like \f, they can
+  // appear mid-verse, and text after the closer must survive. Until this
+  // was fixed, the generic "metadata" handling finished the verse the
+  // moment any of these opened, silently dropping everything after it.
+  test("a cross-reference", () => {
+    const doc = parseUsfm(
+      book(
+        "\\p\n\\v 1 In the beginning \\x - \\xo 1.1: \\xt Gen 2:1.\\x* " +
+          "God created the heaven and the earth.",
+      ),
+    );
+    expect(doc.verses[0]!.text).toBe(
+      "In the beginning God created the heaven and the earth.",
+    );
+    expect(sumLedger(doc.ledger)).toBe(doc.ledger.sourceCharacters);
+    expect(doc.ledger.dropped.get("x")).toBeGreaterThan(0);
+  });
+
+  test("an alternate verse number", () => {
+    const doc = parseUsfm(book("\\p\n\\v 1 Before \\va 2\\va* after."));
+    expect(doc.verses[0]!.text).toBe("Before after.");
+  });
+
+  test("a published verse marker", () => {
+    const doc = parseUsfm(book("\\p\n\\v 1 Before \\vp 1a\\vp* after."));
+    expect(doc.verses[0]!.text).toBe("Before after.");
+  });
+
+  test("an illustration", () => {
+    const doc = parseUsfm(
+      book("\\p\n\\v 1 Before \\fig A map|src.jpg|col|||caption\\fig* after."),
+    );
+    expect(doc.verses[0]!.text).toBe("Before after.");
+  });
+
+  test("a genuine boundary marker still finishes the verse, unaffected", () => {
+    // \s1 is category A — it only ever appears between verses, and should
+    // still behave exactly as before the split.
+    const doc = parseUsfm(book("\\p\n\\v 1 First.\n\\s1 A Heading\n\\p\n\\v 2 Second."));
+    expect(doc.verses).toHaveLength(2);
+    expect(doc.verses[0]!.text).toBe("First.");
+    expect(doc.verses[1]!.text).toBe("Second.");
+  });
+});
+
 describe("front matter is not scripture", () => {
   test("FRT and INT books are read but contribute no verses", () => {
     const doc = parseUsfm(

@@ -39,7 +39,16 @@ export type MarkerRole =
   /** Footnote caller or reference: apparatus rather than prose, so dropped. */
   | "footnote-reference"
   /** Document-level information dropped from the text: book names, TOC entries. */
-  | "metadata";
+  | "metadata"
+  /**
+   * Inline apparatus with its own `*` closer — `\x`, `\va`, `\vp`, `\fig` —
+   * dropped like `"metadata"`, but the sink resumes where it was once the
+   * closer is seen, because these can appear *mid-verse*. `"metadata"`
+   * markers only ever appear between verses, so finishing the verse there
+   * is correct; doing the same here truncated everything after an inline
+   * cross-reference.
+   */
+  | "discard";
 
 const MARKER_ROLES: ReadonlyMap<string, MarkerRole> = new Map([
   // Structure.
@@ -93,9 +102,12 @@ const MARKER_ROLES: ReadonlyMap<string, MarkerRole> = new Map([
   ["ie", "metadata"], ["imt", "metadata"], ["imt1", "metadata"],
   ["ide", "metadata"], ["rem", "metadata"], ["sts", "metadata"],
   ["cl", "metadata"], ["cp", "metadata"], ["ca", "metadata"],
-  ["va", "metadata"], ["vp", "metadata"], ["periph", "metadata"],
-  ["x", "metadata"], ["xo", "metadata"], ["xt", "metadata"], ["xk", "metadata"],
-  ["fig", "metadata"], ["ndx", "metadata"],
+  ["va", "discard"], ["vp", "discard"], ["periph", "metadata"],
+  // xo/xt/xk have no closer of their own — they only ever appear already
+  // nested inside an open \x...\x*, which has already parked the sink at
+  // "drop", so a no-op is correct and needs no state of its own.
+  ["x", "discard"], ["xo", "transparent"], ["xt", "transparent"], ["xk", "transparent"],
+  ["fig", "discard"], ["ndx", "metadata"],
 ]);
 
 export class UnknownMarkerError extends Error {
@@ -247,6 +259,8 @@ export function parseUsfm(usfm: string): UsfmDocument {
   let current: Mutable | null = null;
   let sink: "verse" | "title" | "note" | "drop" = "drop";
   let dropKey = "front-matter";
+  /** What to restore `sink` to when a `"discard"` span closes. */
+  let savedSink: "verse" | "title" | "note" | "drop" | null = null;
   let pending: { chapter: number; text: string; length: number } | null = null;
   let expecting: "book-id" | "chapter-number" | "verse-number" | null = null;
   let skipBook = false;
@@ -423,8 +437,16 @@ export function parseUsfm(usfm: string): UsfmDocument {
 
     if (token.marker.endsWith("*")) {
       const opener = token.marker.slice(0, -1);
-      if (!MARKER_ROLES.has(opener)) throw new UnknownMarkerError(opener, book);
+      const openerRole = MARKER_ROLES.get(opener);
+      if (openerRole === undefined) throw new UnknownMarkerError(opener, book);
       if (opener === "f") sink = current === null ? "drop" : "verse";
+      if (openerRole === "discard") {
+        // Falls back to the same formula \f* uses, for the case a discard
+        // marker somehow opens with no prior sink recorded — defensive,
+        // not expected to fire since every "discard" opener sets savedSink.
+        sink = savedSink ?? (current === null ? "drop" : "verse");
+        savedSink = null;
+      }
       if (opener === "qs" && selah !== null) {
         const balanced = closeSelahBracket(collapse(selah));
         if (current !== null) current.text += balanced;
@@ -499,6 +521,14 @@ export function parseUsfm(usfm: string): UsfmDocument {
         settlePending(false);
         finish(current);
         current = null;
+        sink = "drop";
+        dropKey = token.marker;
+        break;
+      case "discard":
+        // Unlike "metadata", these can appear mid-verse — \x, \va, \vp,
+        // \fig each close with their own \*, so the verse being built is
+        // left alone rather than finished, and the sink resumes on close.
+        savedSink = sink;
         sink = "drop";
         dropKey = token.marker;
         break;
