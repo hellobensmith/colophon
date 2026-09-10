@@ -34,8 +34,8 @@ export type Source =
     };
 
 export interface SourceDocument {
-  /** The XML to parse. */
-  readonly xml: string;
+  /** The source text to parse — USFX, USX, or USFM, per `detectFormat()`. */
+  readonly text: string;
   /** Human-readable provenance, for the build log and the manifest. */
   readonly origin: string;
   /** Bytes the identity is derived from — the archive, or the files as read. */
@@ -67,7 +67,7 @@ export async function readLocal(target: string): Promise<SourceDocument> {
   if (statSync(resolved).isFile()) {
     const bytes = new Uint8Array(await Bun.file(resolved).arrayBuffer());
     return {
-      xml: await Bun.file(resolved).text(),
+      text: await Bun.file(resolved).text(),
       origin: resolved,
       bytes,
     };
@@ -103,7 +103,7 @@ export async function readLocal(target: string): Promise<SourceDocument> {
   }
 
   return {
-    xml: parts.join("\n"),
+    text: parts.join("\n"),
     origin: `${resolved} (${entries.length} files)`,
     bytes,
   };

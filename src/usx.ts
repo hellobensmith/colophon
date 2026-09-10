@@ -85,12 +85,29 @@ export function parseUsx(xml: string): UsfmDocument {
   const books: string[] = [];
   const dropped = new Map<string, number>();
 
+  // Ledger counters, matching usfx.ts's rigor: every source character is
+  // either emitted somewhere or dropped somewhere, and the totals must
+  // agree. Keyed by the innermost open element's style (or tag name where a
+  // style attribute doesn't apply), the same idea as usfx.ts's elementStack
+  // — usx.ts already tracks that as `stack` for role bookkeeping, so this
+  // reuses it rather than adding new state.
+  const toVerses = new Map<string, number>();
+  const toTitles = new Map<string, number>();
+  const toSubscriptions = new Map<string, number>();
+  const toNotes = new Map<string, number>();
+  let unattributed = 0;
+  let sourceCharacters = 0;
+
+  const record = (bucket: Map<string, number>, key: string, length: number): void => {
+    if (length > 0) bucket.set(key, (bucket.get(key) ?? 0) + length);
+  };
+
   let book = "";
   let chapter = 0;
   let skipBook = false;
 
   let current: { bcv: string; book: string; chapter: number; verse: number; text: string; note: string } | null = null;
-  let pending: { chapter: number; text: string } | null = null;
+  let pending: { chapter: number; text: string; length: number } | null = null;
   let selah: string | null = null;
   let dropKey = "outside-verse";
 
@@ -106,6 +123,12 @@ export function parseUsx(xml: string): UsfmDocument {
   let noteDepth = 0;
   let metadataDepth = 0;
   const stack: { name: string; style: string; role: string }[] = [];
+
+  /** The innermost open element's style (or tag name, absent a style) — how a ledger leak reports its source. */
+  const currentKey = (): string => {
+    const top = stack[stack.length - 1];
+    return top === undefined ? "(root)" : top.style || top.name;
+  };
 
   const sinkNow = (): Sink => {
     if (noteDepth > 0) return current === null ? "drop" : "note";
@@ -136,6 +159,12 @@ export function parseUsx(xml: string): UsfmDocument {
   /** A `<para style="d">` is a superscription if a verse follows, else a subscription. */
   const settlePending = (followedByVerse: boolean) => {
     if (pending === null) return;
+    // Which map this text belongs to is only known now, exactly as in
+    // usfm.ts's settlePending — recorded here even if the trimmed text below
+    // turns out empty, since the ledger tracks where text was semantically
+    // routed, not only what ended up in a populated map.
+    if (followedByVerse) record(toTitles, currentKey(), pending.length);
+    else record(toSubscriptions, currentKey(), pending.length);
     const text = collapse(pending.text).trim();
     if (text !== "" && !skipBook) {
       const key = `${book}.${pending.chapter}`;
@@ -146,25 +175,51 @@ export function parseUsx(xml: string): UsfmDocument {
   };
 
   const emit = (raw: string) => {
+    // Counted once, unconditionally, before any routing decision — every
+    // source run lands in exactly one bucket, so the balance invariant holds
+    // by construction. Raw, pre-decode length: an entity like `&amp;` is 5
+    // source characters even though the decoded text stored below is 1 —
+    // matching usfx.ts's own convention of counting what was consumed from
+    // source, not what ended up stored.
+    sourceCharacters += raw.length;
     const text = decode(raw);
     if (skipBook) {
-      drop("front-matter", text.length);
+      drop("front-matter", raw.length);
       return;
     }
     switch (sinkNow()) {
       case "verse":
-        if (selah !== null) selah += text;
-        else if (current !== null) current.text += text;
-        else drop("outside-verse", text.length);
+        if (selah !== null) {
+          selah += text;
+          record(toVerses, currentKey(), raw.length);
+        } else if (current !== null) {
+          current.text += text;
+          record(toVerses, currentKey(), raw.length);
+        } else {
+          drop("outside-verse", raw.length);
+        }
         break;
       case "title":
-        if (pending !== null) pending.text += text;
+        if (pending !== null) {
+          pending.text += text;
+          pending.length += raw.length;
+        } else {
+          // Unreachable in well-formed input — sinkNow() only returns
+          // "title" while `pending` is open — but kept as a defensive,
+          // ledger-honest fallback rather than a silent loss.
+          drop("stray-title", raw.length);
+        }
         break;
       case "note":
-        if (current !== null) current.note += text;
+        if (current !== null) {
+          current.note += text;
+          record(toNotes, currentKey(), raw.length);
+        } else {
+          drop("stray-note", raw.length);
+        }
         break;
       case "drop":
-        drop(dropKey, text.length);
+        drop(dropKey, raw.length);
         break;
     }
   };
@@ -267,7 +322,7 @@ export function parseUsx(xml: string): UsfmDocument {
     if (tag.name === "para" && style === "d") {
       settlePending(false);
       finish();
-      pending = { chapter, text: "" };
+      pending = { chapter, text: "", length: 0 };
     } else if (tag.name === "note") {
       noteDepth += 1;
       dropKey = "note";
@@ -310,5 +365,19 @@ export function parseUsx(xml: string): UsfmDocument {
   finish();
   settlePending(false);
 
-  return { verses, titles, subscriptions, books, dropped };
+  return {
+    verses,
+    titles,
+    subscriptions,
+    books,
+    ledger: {
+      toVerses,
+      toTitles,
+      toSubscriptions,
+      toNotes,
+      dropped,
+      unattributed,
+      sourceCharacters,
+    },
+  };
 }

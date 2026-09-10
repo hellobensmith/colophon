@@ -24,6 +24,7 @@
  */
 
 import { closeSelahBracket } from "./usfx.ts";
+import type { ScriptureDocument, Verse } from "./document.ts";
 
 /** What a marker does with the text that follows it. */
 export type MarkerRole =
@@ -124,8 +125,23 @@ interface Token {
  * text and only ends the wrapper. Attributes after `|` inside `\w` are metadata
  * about the word, not the word: "In|strong=H8064" is the word "In".
  */
-function tokenize(usfm: string): Token[] {
+interface Tokenized {
+  readonly tokens: readonly Token[];
+  /**
+   * Count of the one-space marker/content separators consumed by
+   * {@link pushText} below (see its own comment). Each is a real source
+   * character, but stripping it can leave nothing to push a token for — an
+   * opener immediately followed by another marker (`\p \q1`) strips its
+   * whole one-character run down to `""`, and no token means nowhere on a
+   * token to record it. Counted here instead and added to the ledger's
+   * `unattributed` total once, by the caller, rather than per-token.
+   */
+  readonly strippedSeparators: number;
+}
+
+function tokenize(usfm: string): Tokenized {
   const tokens: Token[] = [];
+  let strippedSeparators = 0;
   // A marker nested inside another character marker carries a "+" prefix:
   // "[\\+w Selah\\+w*]" is the word Selah inside a bracket run. The prefix says
   // where the marker sits, not what it is, so it is stripped and the marker
@@ -141,7 +157,9 @@ function tokenize(usfm: string): Token[] {
     // is syntax, not text: `\w the|strong="H5892"` is the word "the", and
     // keeping the separator turns `Calah (the same` into `Calah ( the same`.
     // Closing markers take no separator, so this applies to openers only.
-    const text = afterOpener && raw.startsWith(" ") ? raw.slice(1) : raw;
+    const stripSeparator = afterOpener && raw.startsWith(" ");
+    const text = stripSeparator ? raw.slice(1) : raw;
+    if (stripSeparator) strippedSeparators += 1;
     afterOpener = false;
     if (text !== "") tokens.push({ marker: null, text });
   };
@@ -155,7 +173,7 @@ function tokenize(usfm: string): Token[] {
     cursor = pattern.lastIndex;
   }
   if (cursor < usfm.length) pushText(usfm.slice(cursor));
-  return tokens;
+  return { tokens, strippedSeparators };
 }
 
 /** Strips a `\w` attribute tail: the word is everything before the first `|`. */
@@ -168,22 +186,13 @@ function collapse(text: string): string {
   return text.replace(/\s+/g, " ");
 }
 
-export interface UsfmVerse {
-  readonly bcv: string;
-  readonly book: string;
-  readonly chapter: number;
-  readonly verse: number;
-  readonly text: string;
-  readonly note: string | null;
-}
-
-export interface UsfmDocument {
-  readonly verses: readonly UsfmVerse[];
-  readonly titles: ReadonlyMap<string, string>;
-  readonly subscriptions: ReadonlyMap<string, string>;
-  readonly books: readonly string[];
-  readonly dropped: ReadonlyMap<string, number>;
-}
+/**
+ * `UsfmDocument`/`UsfmVerse` are the same shape every reader produces — see
+ * `src/document.ts`. Kept as named aliases because "a USFM verse" is still
+ * the clearer thing to say at most of this file's own call sites.
+ */
+export type UsfmVerse = Verse;
+export type UsfmDocument = ScriptureDocument;
 
 interface Mutable {
   bcv: string;
@@ -216,12 +225,29 @@ export function parseUsfm(usfm: string): UsfmDocument {
     if (length > 0) dropped.set(key, (dropped.get(key) ?? 0) + length);
   };
 
+  // Ledger counters, matching usfx.ts's rigor: every source character is
+  // either emitted somewhere or dropped somewhere, and the totals must
+  // agree. USFM has no nested-element stack the way XML does — a marker's
+  // text isn't wrapped inside it the way `<w>text</w>` is — so buckets are
+  // keyed by destination rather than by carrying element; `dropped` keeps
+  // its existing, more specific keys unchanged.
+  const toVerses = new Map<string, number>();
+  const toTitles = new Map<string, number>();
+  const toSubscriptions = new Map<string, number>();
+  const toNotes = new Map<string, number>();
+  let unattributed = 0;
+  let sourceCharacters = 0;
+
+  const record = (bucket: Map<string, number>, key: string, length: number): void => {
+    if (length > 0) bucket.set(key, (bucket.get(key) ?? 0) + length);
+  };
+
   let book = "";
   let chapter = 0;
   let current: Mutable | null = null;
   let sink: "verse" | "title" | "note" | "drop" = "drop";
   let dropKey = "front-matter";
-  let pending: { chapter: number; text: string } | null = null;
+  let pending: { chapter: number; text: string; length: number } | null = null;
   let expecting: "book-id" | "chapter-number" | "verse-number" | null = null;
   let skipBook = false;
   /*
@@ -249,6 +275,15 @@ export function parseUsfm(usfm: string): UsfmDocument {
 
   const settlePending = (followedByVerse: boolean) => {
     if (pending === null) return;
+    // Which map this text belongs to is only known now — whether a verse
+    // follows the \d decides title vs. subscription — so the characters
+    // accumulated while pending was open are recorded here, at close time,
+    // rather than in the case "title" branch where they were consumed. This
+    // still records them even if the trimmed text below turns out empty:
+    // the ledger tracks where text was semantically routed, not only what
+    // ended up in a populated map, matching usfx.ts's own convention.
+    if (followedByVerse) record(toTitles, "(title)", pending.length);
+    else record(toSubscriptions, "(subscription)", pending.length);
     const text = collapse(pending.text).trim();
     if (text !== "" && !skipBook) {
       const key = `${book}.${pending.chapter}`;
@@ -258,8 +293,21 @@ export function parseUsfm(usfm: string): UsfmDocument {
     pending = null;
   };
 
-  for (const token of tokenize(usfm)) {
+  const { tokens, strippedSeparators } = tokenize(usfm);
+  // The marker/content separator space tokenize() strips is real source text
+  // with no token to attach a count to (see Tokenized's own comment) — a
+  // structural syntax character, not carried by any marker, so it joins
+  // usfx.ts's own "whitespace between elements" bucket.
+  sourceCharacters += strippedSeparators;
+  unattributed += strippedSeparators;
+
+  for (const token of tokens) {
     if (token.marker === null) {
+      // Counted once, unconditionally, before any routing decision below —
+      // so every text token lands in exactly one bucket and the balance
+      // invariant holds by construction rather than by later reconciliation.
+      sourceCharacters += token.text.length;
+
       if (expecting === "book-id") {
         const id = token.text.trim().split(/\s+/)[0] ?? "";
         book = id;
@@ -267,9 +315,11 @@ export function parseUsfm(usfm: string): UsfmDocument {
         if (!skipBook && id !== "" && !books.includes(id)) books.push(id);
         chapter = 0;
         expecting = null;
-        // The remainder of the \id line is document furniture.
-        const rest = token.text.trim().slice(id.length);
-        drop("id", rest.length);
+        // The whole \id line — the id itself, its surrounding whitespace,
+        // and any trailing furniture — is bookkeeping only, never stored as
+        // output text, so the full token is dropped rather than just the
+        // reconstructed remainder after the id.
+        drop("id", token.text.length);
         continue;
       }
       if (expecting === "chapter-number") {
@@ -278,9 +328,11 @@ export function parseUsfm(usfm: string): UsfmDocument {
         if (Number.isNaN(number)) throw new Error(`Malformed chapter marker in ${book}: "${trimmed}"`);
         chapter = number;
         expecting = null;
-        drop("chapter-number", String(number).length);
-        const rest = token.text.slice(token.text.indexOf(trimmed) + String(number).length);
-        drop("chapter-number", rest.trim().length);
+        // Same reasoning as \id above: the chapter number is bookkeeping
+        // only, so the whole token — number, whitespace, and any trailing
+        // newline — is dropped as one span rather than reconstructed piece
+        // by piece.
+        drop("chapter-number", token.text.length);
         continue;
       }
       if (expecting === "verse-number") {
@@ -299,7 +351,14 @@ export function parseUsfm(usfm: string): UsfmDocument {
         drop("verse-number", match[0].length);
         expecting = null;
         sink = "verse";
-        current.text += token.text.slice(match[0].length);
+        // The remainder of this token is real verse text — everything from
+        // "1 In the beginning" after the "1 " above — so it gets the same
+        // word/attribute split as ordinary verse-sink text.
+        const tail = token.text.slice(match[0].length);
+        const word = wordTextAware(tail);
+        current.text += word;
+        record(toVerses, "(verse)", word.length);
+        drop("word-attribute", tail.length - word.length);
         continue;
       }
 
@@ -308,16 +367,52 @@ export function parseUsfm(usfm: string): UsfmDocument {
         continue;
       }
       switch (sink) {
-        case "verse":
-          if (selah !== null) selah += wordTextAware(token.text);
-          else if (current !== null) current.text += wordTextAware(token.text);
-          else drop("stray", token.text.length);
+        case "verse": {
+          // `\w the|strong="H5892"` is the word "the": the `|strong=...` tail
+          // is consumed from source but never stored, so it is accounted
+          // here rather than silently vanishing from the ledger.
+          const word = wordTextAware(token.text);
+          if (selah !== null) {
+            selah += word;
+            record(toVerses, "(verse)", word.length);
+          } else if (current !== null) {
+            current.text += word;
+            record(toVerses, "(verse)", word.length);
+          } else {
+            drop("stray", token.text.length);
+            break;
+          }
+          drop("word-attribute", token.text.length - word.length);
           break;
-        case "title":
-          if (pending !== null) pending.text += wordTextAware(token.text);
+        }
+        case "title": {
+          if (pending !== null) {
+            const word = wordTextAware(token.text);
+            pending.text += word;
+            pending.length += word.length;
+            drop("word-attribute", token.text.length - word.length);
+          } else {
+            // Unreachable in well-formed input — sink is only ever set to
+            // "title" in the same statement that opens `pending` (the \d
+            // handling below) — but kept as a defensive, ledger-honest
+            // fallback rather than a silent loss if that ever changes.
+            drop("stray-title", token.text.length);
+          }
           break;
+        }
         case "note":
-          if (current !== null) current.note += token.text;
+          // No wordTextAware split here, deliberately: a \w inside a
+          // footnote would leak its |strong=... tail into stored note text
+          // today, unlike the verse/title cases above. Pre-existing, not
+          // introduced by this ledger work — noted, not silently fixed,
+          // since fixing it changes footnote content rather than accounting
+          // for it.
+          if (current !== null) {
+            current.note += token.text;
+            record(toNotes, "(note)", token.text.length);
+          } else {
+            drop("stray-note", token.text.length);
+          }
           break;
         case "drop":
           drop(dropKey, token.text.length);
@@ -368,7 +463,7 @@ export function parseUsfm(usfm: string): UsfmDocument {
       settlePending(false);
       finish(current);
       current = null;
-      pending = { chapter, text: "" };
+      pending = { chapter, text: "", length: 0 };
       sink = "title";
       continue;
     }
@@ -414,7 +509,21 @@ export function parseUsfm(usfm: string): UsfmDocument {
   finish(current);
   settlePending(false);
 
-  return { verses, titles, subscriptions, books, dropped };
+  return {
+    verses,
+    titles,
+    subscriptions,
+    books,
+    ledger: {
+      toVerses,
+      toTitles,
+      toSubscriptions,
+      toNotes,
+      dropped,
+      unattributed,
+      sourceCharacters,
+    },
+  };
 }
 
 /** `\w` attributes travel in the text node; the word is everything before `|`. */

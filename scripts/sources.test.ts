@@ -27,7 +27,7 @@ describe("a single file handed over directly", () => {
     const file = path.join(dir, "one.xml");
     await Bun.write(file, "<usfx>a</usfx>");
     const source = await readLocal(file);
-    expect(source.xml).toBe("<usfx>a</usfx>");
+    expect(source.text).toBe("<usfx>a</usfx>");
     expect(source.bytes.byteLength).toBe(14);
     expect(source.origin).toContain("one.xml");
   });
@@ -45,9 +45,9 @@ describe("a directory of per-book files, as a DBL bundle ships them", () => {
     await Bun.write(path.join(bundle, "metadata.json"), "{}");
 
     const source = await readLocal(bundle);
-    expect(source.xml.indexOf("gen")).toBeLessThan(source.xml.indexOf("exo"));
-    expect(source.xml.indexOf("exo")).toBeLessThan(source.xml.indexOf("lev"));
-    expect(source.xml).not.toContain("{}");
+    expect(source.text.indexOf("gen")).toBeLessThan(source.text.indexOf("exo"));
+    expect(source.text.indexOf("exo")).toBeLessThan(source.text.indexOf("lev"));
+    expect(source.text).not.toContain("{}");
     expect(source.origin).toContain("3 files");
   });
 
@@ -57,7 +57,7 @@ describe("a directory of per-book files, as a DBL bundle ships them", () => {
     const bundle = path.join(dir, "bundle");
     const first = await readLocal(bundle);
     const second = await readLocal(bundle);
-    expect(second.xml).toBe(first.xml);
+    expect(second.text).toBe(first.text);
     expect([...second.bytes]).toEqual([...first.bytes]);
   });
 });
