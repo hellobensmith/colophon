@@ -49,8 +49,8 @@ Measured on the deployed Worker rather than a laptop, and re-measured by
 
 | | Measured | Limit |
 | --- | --- | --- |
-| Bundle | 1.94 MB gzip | 10 MB on this account's plan; 3 MB on the free plan |
-| CPU per request | 6–18 ms median, 39 ms peak | none enforced on this plan; 10 ms on the free plan |
+| Bundle | 4.05 MB gzip (two translations) | 10 MB on this account's plan; 3 MB on the free plan |
+| CPU per request | 9–39 ms median, 47–112 ms worst | none enforced on this plan; 10 ms on the free plan |
 | Worker startup | ~19 ms | 1,000 ms |
 | Requests | — | 100,000/day on the free plan |
 
@@ -88,7 +88,7 @@ into. See [Limitations](#limitations) for what this costs.
 ```bash
 bun install
 bun run build:data   # download, parse, verify, and generate src/data/
-bun test             # 57 tests
+bun test             # runs the suite
 bun run dev          # http://localhost:8787
 ```
 
@@ -161,6 +161,8 @@ same missing chapter, so they return the same status. Reserving 400 for input
 the parser genuinely cannot read keeps the two cases distinguishable by a client.
 
 ## Endpoints
+
+Every endpoint accepts `?translation=`, defaulting to `asv`.
 
 | Endpoint | Purpose |
 | --- | --- |
@@ -432,7 +434,12 @@ NABRE order, Orthodox against Rahlfs-Hanhart's `Septuaginta`.
 | `scripts/build-data.ts` | Download, parse, verify, generate |
 | `src/identity.ts` | Revision and generation identity |
 | `src/tokenize.ts` | The one tokenizer, shared by index and query |
+| `src/document.ts` | The shared document/ledger shape every reader produces |
+| `src/ingest.ts` | Format dispatch — USFX, USFM, or USX in |
 | `src/usfx.ts` | USFX XML → verses, titles, notes |
+| `src/usfm.ts` | USFM marker text → verses, titles, notes |
+| `src/usx.ts` | USX XML → verses, titles, notes |
+| `src/usx-styles.ts` | USX `style` vocabulary, generated from the schema |
 | `src/validate.ts` | The assertions the build must pass |
 | `src/data/` | Generated; do not edit |
 | `src/canon.ts` | Book metadata and canon orderings |
@@ -444,4 +451,6 @@ NABRE order, Orthodox against Rahlfs-Hanhart's `Septuaginta`.
 ## Source
 
 Text from [ebible.org](https://ebible.org/Scriptures/eng-asv_usfx.zip), the
-USFX edition of the American Standard Version (1901). Public domain.
+USFX edition of the American Standard Version (1901). Public domain. The
+Douay-Rheims comes from the same publisher, as
+[engDRA](https://ebible.org/Scriptures/engDRA_usfx.zip), also public domain.
