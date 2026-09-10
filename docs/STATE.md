@@ -1,6 +1,6 @@
 # State — read this first
 
-Last updated 8 September 2026 · public repo · deployed
+Last updated 9 September 2026 · public repo · deployed
 
 This file is a **progress tracker**, not the source of truth. The code is the
 source of truth; this exists so a session does not re-derive what an earlier one
@@ -106,6 +106,16 @@ directly comparable psalms, 82 match exactly, 59 read one higher because the
 superscription is verse 1, and **5 read two higher because their superscription
 runs to two lines** — Greek 50:1-2 is the visible example. Nothing is
 unaccounted for.
+
+**Flagged 9 September 2026, not corrected**: three independent attempts this
+session to recompute this breakdown (a quick per-chapter count diff, a
+DRA-text read restricted to candidate two-line titles, and an adversarial
+review's own recount) each produced a *different* 82/59/5-shaped total, and
+none checked against a primary source outside this codebase — every attempt
+reasoned from the ASV and DRA against each other. The number above stays
+unchanged because no attempt earned the confidence to replace it with another
+unverified one. Before touching it again: check a real Vulgate edition
+directly. See the parked psalm-numbering investigation below.
 
 **32 of the 66 shared books differ in versification**, and not only the odd ones.
 EST is 10 chapters in the ASV and 16 in the DRA; DAN is 12 and 14. But Genesis,
@@ -409,15 +419,32 @@ which text it is holding. Repo, Worker, package and docs all renamed; the old
 1. ~~Send the Bible.org outreach?~~ **Decided 7 September 2026: no.** The draft
    stays at `conformance/outreach/bible-org.md` as a record of the approach; it
    is not being sent. Do not re-open this without Ben saying so.
-2. **Publish the matrix** — this was gated behind the outreach, which is no
-   longer happening, so the gate is gone and the question is open on its own
-   terms. The framing in `conformance/report.md` is already transparency rather
-   than scorecard.
-3. **Should the conformance suite become the front door** — a service any API
-   runs against itself — rather than a file in this repository?
+2. ~~Publish the matrix~~ **Decided 9 September 2026: yes, as a link.** The
+   README now points at `conformance/report.md` — GitHub renders it natively,
+   so no new infrastructure was needed. The framing there is already
+   transparency rather than scorecard, which is what made linking it safe.
+3. ~~Should the conformance suite become the front door~~ **Decided 9
+   September 2026: no.** A hosted service that judges other APIs live would
+   make Colophon the aggregator this project exists to refuse to be — this
+   project's own API is a subject in the conformance table, not the judge of
+   it, and that framing only holds while the suite stays a file anyone can
+   read and rerun themselves. Do not re-open this without Ben saying so.
 4. **Verse-data caching is capped at a day.** Raising it needs either a real
    purge, which workers.dev has no zone for, or the generation id in the URL.
    Deliberate, and Ben can overrule it — see the trap below.
+5. **DRA support in `src/psalms.ts` — parked as an investigation, 9 September
+   2026.** A design to hand-build a 146-row offset table so DRA verse numbers
+   agree with `greekVerseCount()` (an ASV-derived model) went to review, which
+   found DRA likely already prints native Vulgate numbering — the table would
+   have forced DRA to agree with the ASV's reconstruction of it rather than
+   trusting DRA's own numbers, the project's core failure mode one level up.
+   Two concrete bugs surfaced in the process, in the ASV's own *already
+   shipped* `numbering=greek`: `fromGreek(4, 10)` throws though Vulgate 4:10
+   is real, and `fromGreek(12, 7)` returns a real ASV verse from the wrong
+   coordinate under HTTP 200. Fix those first. Then check DRA's own verse
+   structure against a real Vulgate text before designing anything — see the
+   flagged note above. `numbering=greek&translation=dra` stays a 501 until
+   then; that refusal is honest, an unverified table would not be.
 
 ---
 

@@ -32,6 +32,12 @@ The ASV is public domain. So is this data. Nothing here costs money to run.
 already settled and why, and the facts that were costly to establish.
 `CLAUDE.md` carries the invariants that must not be violated.
 
+**Wondering how this compares to other Scripture APIs?** [`conformance/report.md`](conformance/report.md)
+measures this API against six others on the same semantic questions — reference
+resolution, textual integrity, self-description, wire contract. Published for
+transparency, not as a scorecard: this project's own API is a subject in the
+table, not the judge of it.
+
 ## How it works
 
 The whole Bible — 31,102 verses — is compiled into the Worker itself. A request
