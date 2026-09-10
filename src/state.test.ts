@@ -186,18 +186,13 @@ describe("STATE.md's stated sums add up", () => {
     expect(n(m![2]!) + n(m![3]!) + n(m![4]!)).toBe(n(m![1]!));
   });
 
-  test("the psalm title-line distribution tallies to 150", () => {
-    const none = Number(STATE.match(/(\d+)\s+carry\s+no\s+separate\s+Vulgate\s+title\s+verse/)![1]!);
-    const one = Number(STATE.match(/(\d+)\s+carry\s+one/)![1]!);
-    const two = Number(STATE.match(/and\s+(\d+)\s*—\s*Psalms 50, 51, 53, 59/)![1]!);
-    expect(none + one + two).toBe(150);
-  });
-
-  test("the naive-borrowing correction tallies to 150", () => {
-    const right = Number(STATE.match(/gets\s+(\d+)\s+of\s+the\s+150\s+right/)![1]!);
-    const wrong = Number(STATE.match(/and\s+(\d+)\s+wrong/)![1]!);
-    expect(right + wrong).toBe(150);
-  });
+  // The psalm title-line distribution (84/62/4) and the naive-borrowing
+  // correction (98 right, 52 wrong) were narrative from the 9 September
+  // investigation, not durable state — the design they explain (borrowing
+  // the Hebrew psalm's own superscription status) was rejected in favor of
+  // direct Vulgate verification, and neither number is referenced by any
+  // other fact in this file. Trimmed 10 September along with the rest of
+  // that investigation's blow-by-blow; git history has the full account.
 });
 
 describe("STATE.md keeps the shape the checker depends on", () => {

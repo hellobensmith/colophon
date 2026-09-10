@@ -78,215 +78,28 @@ bun run deploy
 
 ---
 
-## Where Phase 1 stands — Douay-Rheims
+## Phase 1 and Phase 2 — where things stand
 
-Not "add a translation." **Prove the architecture is plural using the text that
-stresses it hardest.** It has already done that, and the answer is not the one
-the plan assumed.
+### Phase 1 — plural translations, done
 
-**Verified 7 September from the source, with `parseUsfx` unchanged** — no new
-element roles, nothing added to `ELEMENT_ROLES`:
+The Douay-Rheims proved the
+architecture is plural using the text that stresses it hardest — not just
+"add a translation." Versification, corpus text, `data_availability`,
+ingest, and `validate.ts` are all per-translation now (`src/versification.ts`,
+`src/corpus.ts`, `scripts/editions.ts`, `src/expectations/`); the DRA-specific
+numbers and the Greek/Hebrew psalm-numbering verification are in "Facts that
+were expensive to establish" below, not repeated here. One intentional
+behavior change along the way, still true today: `/books/:id` and
+`/books/:id/chapters/:num` used to silently answer from the ASV under HTTP
+200 for an unknown `?translation=`; both now 404 an unknown id like every
+other route. `EDITION_ORDER` (what an edition prints) and `CANON_ORDER`
+(what a tradition counts) are kept deliberately separate —
+`src/edition.test.ts` asserts they *disagree* about Tobit's position, so a
+future collapse of one into the other fails loudly. The per-Worker
+federation idea (a publisher self-hosting their own text entirely) stays a
+*vision* question, not forced by any ceiling — see the roadmap artifact.
 
-- **73 books, 35,811 verses**, coverage ledger balanced exactly
-  (4,652,766 source characters = 4,645,927 emitted + 3,559 dropped + 3,280
-  unattributed)
-- **Zero empty verses**, where the ASV has 16
-- **Zero `<d>` titles and zero footnotes.** New, and not what was assumed here
-  before: the DRA folds each psalm superscription into verse 1 rather than
-  marking it, so none of the title machinery built for the ASV fires at all
-- Source `https://ebible.org/Scriptures/engDRA_usfx.zip`, 2,946,666 bytes,
-  sha256 `9dfbc526d699e9e461d0a8419c60dd12390e8618af7ac3e97083ae5e53e2ed29`
-
-**The Greek psalm numbering is confirmed against the Clementine Vulgate
-itself, not reconstructed from the ASV or DRA against each other.** Ben
-supplied a local copy of the Clementine Vulgate source text
-(vulsearch.sourceforge.net's edition), and every claim below was checked
-against it directly — cross-checked live against drbo.org and
-bible.catholicgallery.org — 9 September 2026.
-
-Every split still sums exactly: Greek 114+115 = 19 = Hebrew 116;
-Greek 146+147 = 20 = Hebrew 147; Greek 113 = 26 = Hebrew 114+115.
-
-**Title structure, all 150 psalms**: 84 carry no separate Vulgate title
-verse (folded into or absent from the first content verse), 62 carry one,
-and 4 — Psalms 50, 51, 53, 59, each a long historical superscription — carry
-two, splitting across two Vulgate verses instead of one. Naively borrowing
-the corresponding Hebrew psalm's own superscription status — what
-`src/psalms.ts` did until 9 September — gets 98 of the 150 right and 52
-wrong (48 where the Vulgate has no title verse the Hebrew's does, the same 4
-two-line psalms, and Greek 145, where the Vulgate titles a psalm the Hebrew
-leaves untitled).
-
-**Separately, nine psalms have a genuine interior content split or merge,
-unrelated to titles** — the Vulgate's own verse divisions disagreeing with
-the ASV's mid-psalm, not just at the title. Found by comparing this
-edition's own verse divisions against the Vulgate directly (a sliding-window
-check matching each ASV verse's distinctive vocabulary against nearby DRA
-verses at the same Vulgate coordinate), then read and mapped verse-by-verse
-against the Latin text: **12** (Hebrew 13 splits its own verse 2, then
-merges verses 5-6 — the psalm behind the original motivating bug),
-**52** (Hebrew 53 splits verse 1, otherwise clean), **71** (Hebrew 72 merges
-verses 1-2), **99** (Hebrew 100 — the Vulgate adds a superscription the
-Hebrew never had, then also merges verses 1-2), **108** (Hebrew 109 merges
-verses 1-2), **145** (Hebrew 146 — another added superscription, then merges
-parts of verses 1-3). One (**129**, Hebrew 130) has a tangled middle
-redistributing verses 4-7 across a different count, refused as a block
-rather than guessed. Two (**43**, **55**) rest on the sliding-window
-alignment alone rather than a full manual re-reading — a method that matched
-hand-verification exactly on every one of the six psalms above it was
-cross-checked against.
-
-A genuine split is answerable honestly: every Vulgate position in it names
-the same, complete ASV verse. A genuine merge is not — returning either ASV
-verse would silently omit real content — so those specific Vulgate verses
-are refused outright (`PsalmNumberingError`, naming the Hebrew verses
-involved) rather than guessed. This closes the exact failure this project
-exists to prevent: a coordinate resolving against one edition's numbering
-and silently reading text from another. `?numbering=greek&translation=dra`
-answers directly now too — the DRA already prints this division natively
-(confirmed against the Vulgate: 145 of 150 psalms match exactly; the five
-that don't are a minor, real edition variance, not a bug), so it needs no
-conversion at all, just a bounds check against its own verse counts.
-
-**32 of the 66 shared books differ in versification**, and not only the odd ones.
-EST is 10 chapters in the ASV and 16 in the DRA; DAN is 12 and 14. But Genesis,
-Matthew, Acts and 29 others differ chapter by chapter too. Now measured from
-both generated corpora rather than asserted: 24 differ in book-level totals,
-and **8 more agree on every total while distributing verses differently** —
-NUM, JOS, JDG, JOB, ECC, ISA, JON, HAG. Those eight are the case that makes
-per-translation versification load-bearing rather than tidy: any check at book
-level calls them identical, and a coordinate resolved against the wrong
-edition returns the wrong verse under a reference that looks fine. There is no shared
-verse skeleton to key against, which settles the plumbing question: `VERSE_COUNTS`,
-`BOOK_START`, `CHAPTER_OFFSET`, `sequenceOf` and `locate` must all become
-per-translation. A verse coordinate is only meaningful with its translation.
-
-**Canon order — decided and built.** eBible's DRA prints the deuterocanon after
-Malachi; `src/canon.ts` interleaves it the NABRE way. Both are real, and they
-answer different questions, so both are kept: `CANON_ORDER` for traditions,
-`EDITION_ORDER` for what an edition prints, with `editionPosition()` alongside
-`canonPosition()`. `src/edition.test.ts` asserts the two orders *disagree* about
-Tobit, so a future collapse of one into the other fails loudly.
-
-**And the architecture holds.** The earlier conclusion in this session — that
-two translations would not fit — was drawn against the free plan's 3 MB limit,
-which does not apply to this account. Verified by deploying a 5.94 MB throwaway
-Worker: the limit is 10 MB, two translations come to ~4.01 MB, and no
-architectural change is needed. See the bundle limit below.
-
-### What Phase 1 still has to build
-
-The plumbing, unchanged from the original plan and now confirmed necessary by
-measurement rather than assumed:
-
-- ~~A `?translation=` parameter defaulting to `asv`~~ **done.**
-  `src/translations.ts` is the registry. All five read routes accept
-  `?translation=` and 404 an unknown id, naming what is served rather than
-  silently falling back — `/books/:id` and `/books/:id/chapters/:num` were
-  answering from the ASV under HTTP 200 until 8 September. Every ASV response
-  checked byte-identical.
-- ~~Versification per translation~~ **done 8 September.** **32 of 66 shared
-  books differ**, so there is no shared skeleton: `src/versification.ts` derives
-  an edition's sequence tables, the registry carries each edition's verse counts,
-  and `versificationOf(id)` memoises the result lazily. `sequenceOf` and `locate`
-  take a translation; ~~`BOOK_START`~~ / ~~`CHAPTER_OFFSET`~~ are gone as module
-  globals.
-- ~~The *text* keyed by `(translation, book)`~~ **done 8 September, and the
-  Douay-Rheims is being served.** `src/corpus.ts` holds both editions' modules
-  and derives each one's offset table on first use, not at module scope: cold
-  start is paid by whichever request an isolate serves first, and it should not
-  be charged for a text nobody asked for. `textAt`, `verseAt`,
-  `verseByReference`, `descriptiveTitle` and `subscription` all take a
-  translation.
-
-  Wiring it exposed exactly the failure the project exists to refuse. With the
-  coordinate layer per-translation and the corpus reads still defaulting,
-  `Esther 14:1` in the Douay-Rheims returned **`JOB.3.5`** — a real verse, from
-  the wrong book, under a reference that looked fine. Resolving with one
-  edition's versification and reading another's text is not a near miss; it is
-  the silent wrong answer, and it took registering a second edition to make it
-  visible.
-
-  The eight books with identical totals and different chapter shapes — NUM, JOS,
-  JDG, JOB, ECC, ISA, JON, HAG — are asserted end to end in
-  `src/editions.test.ts`: same reference, both editions, different words.
-- ~~`data_availability` per `(translation, book)`~~ **done 8 September.** The ASV
-  reports ten books as `metadata_only`: TOB, JDT, WIS, SIR, BAR, 1MA, 2MA, 1ES,
-  3MA, MAN. The DRA supplies seven of them — not 1ES, 3MA or MAN.
-
-  `dataAvailability` in `src/canon.ts` is derived globally (every
-  deuterocanonical book is `metadata_only`), so `ensureAvailable` consulting it
-  first refused Tobit for an edition that prints fourteen chapters of it. The
-  edition's own verse counts are the authority now; the canon metadata only
-  explains why something is absent.
-- ~~The Douay-Rheims is ingested~~ **done 8 September.** `bun run build:data
-  --translation dra` passes every assertion and emits `src/data/dra/`: 35,811
-  verses, 73 books, 1,334 chapters. Its revision id is the archive sha256
-  `9dfbc526…` recorded here on 7 September, so the right archive was read.
-
-  `--report` prints what a source contains and asserts nothing, which is how an
-  edition gets characterised without the gate agreeing with whatever it was fed.
-  `src/expectations/dra.ts` was authored from that report after four
-  cross-checks: per-book verses summing to 35,811, printed order matching
-  `EDITION_ORDER.dra` with no mismatches, the ledger balancing exactly, and
-  every headline figure matching the 7 September measurement. An edition with
-  no expectation set can be reported on but never published.
-
-  One bug this surfaced: `manifest.json` was a single file at the repo root, so
-  the DRA build replaced the ASV's record with its own. Artifacts were already
-  safe under `src/data/<id>/`; the manifest now lives there too.
-- ~~Ingest must tolerate a source with **no `<d>` titles and no footnotes**~~
-  **done 8 September, and it was never a parser change.** This file used to call
-  it "the one parser change the DRA actually needs", contradicting its own note
-  above that the DRA parsed with `parseUsfx` unchanged. What refused a
-  title-less corpus was `src/validate.ts`, whose bucket guards asserted that
-  text had reached the title, subscription and note buckets. Those guards exist
-  to catch routing that silently stopped working, so they now read their premise
-  from the edition: an empty title bucket fails only where the edition claims
-  superscriptions.
-- ~~`validate.ts` hard-codes the ASV's assertions~~ **done 8 September.**
-  `validateCorpus(doc, expected)` takes a `CorpusExpectations`;
-  `src/expectations/asv.ts` holds the ASV's. The assertions now sort three ways
-  — universal (contiguity, the coverage ledger, residual markup), edition-specific
-  (totals, per-book counts, empty verses, dropped-character inventory), and
-  conditional (the bucket guards above). Proven by regenerating the whole corpus
-  through the rewritten gate: `src/data/` came back byte-identical and neither
-  identifier moved.
-
-  Expectations are hand-authored and must never be derived from `src/data/*` —
-  a gate that checks its output against numbers taken from that output passes on
-  any corpus. The duplication between `books` and the generated `VERSE_COUNTS`
-  is the test.
-
-  `src/validate.test.ts` exercises the gate itself in both directions: with
-  `titleCount: 0` an empty title bucket passes, with `titleCount: 116` it fails.
-  Writing those tests surfaced a design gap — book order came from
-  `EDITION_ORDER`, so no small fixture could exist. `CorpusExpectations.order`
-  now overrides it, which is also how a publisher validates a text canon.ts has
-  never heard of.
-- ~~`build:data` hard-codes the ASV source URL~~ **done 8 September.**
-  `bun run build:data --translation <id>` resolves a descriptor from
-  `scripts/editions.ts` — source id, archive URL, unzip member, expectation set
-  — and writes to `src/data/<id>/`. The ASV’s artifacts moved to
-  `src/data/asv/` and the 15 import sites followed. An unknown id is refused by
-  name rather than quietly building the default, which would overwrite a
-  published corpus with the wrong text.
-
-  Build-time descriptors live in `scripts/` so eBible URLs and unzip member
-  names never reach the Worker. eBible’s own ids are inconsistent —
-  `eng-asv` against `engDRA` — so `sourceId` is recorded, never derived.
-
-  Moving the output directory left **both identifiers unmoved**: the manifest
-  records artifact names, not paths, so identity binds to content. Verified by
-  rebuilding — git reported four 100% renames and no content change.
-
-The per-Worker federation idea is worth keeping as a *vision* question — it is
-how a publisher self-hosts their own text — but it is no longer forced by any
-ceiling, and Phase 1 should not wait on it.
-
----
-
-## Where Phase 2 stands — bring your own text
+### Phase 2 — bring your own text, substantially built
 
 More already existed than this file said. Three commits from 8 September —
 `src/usfm.ts`, `src/usx.ts`, `src/format.ts`, local-bundle reading in
@@ -399,6 +212,46 @@ Sixteen verses are empty by design (MAT 17:21, 18:11, 23:14; MRK 7:16, 9:44,
 ROM 16:24), each carrying its footnote. 116 Psalm superscriptions plus exactly
 one subscription — Habakkuk 3, printed *below* verse 19, distinguished from a
 superscription only by position.
+
+**The Douay-Rheims corpus.** 73 books, 35,811 verses, coverage ledger
+balanced exactly (4,652,766 source characters = 4,645,927 emitted + 3,559 dropped + 3,280
+unattributed). Zero empty verses, where the ASV has 16. Zero
+`<d>` titles and zero footnotes — the DRA folds each psalm superscription
+into verse 1 rather than marking it, so none of the title machinery built
+for the ASV fires at all. Source
+`https://ebible.org/Scriptures/engDRA_usfx.zip`, 2,946,666 bytes, sha256
+`9dfbc526d699e9e461d0a8419c60dd12390e8618af7ac3e97083ae5e53e2ed29`.
+
+**32 of the 66 books the ASV and DRA share differ in versification** — not
+only the obvious ones (EST is 10 chapters in the ASV and 16 in the DRA;
+DAN is 12 and 14). 24 differ in book-level totals; **8 more agree on every
+total while distributing verses differently** — NUM, JOS, JDG, JOB, ECC,
+ISA, JON, HAG. Those eight are the case that makes per-translation
+versification load-bearing rather than tidy: any check at book level calls
+them identical, and a coordinate resolved against the wrong edition returns
+the wrong verse under a reference that looks fine. There is no shared verse
+skeleton to key against. (This is exactly the failure class that surfaced
+mid-build as a real bug, not a hypothetical: with the coordinate layer
+per-translation but corpus reads still defaulting to the ASV, `Esther 14:1`
+in the Douay-Rheims briefly returned `JOB.3.5` — a real verse, from the
+wrong book, under a reference that looked fine.)
+
+**Greek/Hebrew psalm numbering, checked against the Clementine Vulgate
+directly**, not reconstructed from the ASV or DRA against each other (Ben
+supplied a local copy of the source text; cross-checked live against
+drbo.org and bible.catholicgallery.org, 9 September 2026). Every split still
+sums exactly: Greek 114+115 = 19 = Hebrew 116; Greek 146+147 = 20 = Hebrew
+147; Greek 113 = 26 = Hebrew 114+115. Nine psalms —
+12, 43, 52, 55, 71, 99, 108, 129, 145 — have a genuine interior content
+split or merge where the Vulgate's own verse divisions disagree with the
+ASV's, not just at the title; specific verses in those are refused
+(`PsalmNumberingError`) rather than guessed, since returning either half of
+a merged verse would silently omit real content. The DRA needs none of
+this: it already prints the Vulgate's own division natively (145 of 150
+psalms match exactly; five are a minor, real edition variance, not a bug),
+so `?numbering=greek&translation=dra` is a bounds check against its own
+verse counts, not a conversion. See the Decisions table above for the
+full coordinate-count breakdown.
 
 **Typography.** Six distinct non-ASCII characters, 2,178 occurrences. The corpus
 contains **zero ASCII apostrophes** — all 1,999 are U+2019 — and uses `æ` in
@@ -575,124 +428,21 @@ which text it is holding. Repo, Worker, package and docs all renamed; the old
    answers directly now. Separately, the ASV's own `numbering=greek` had a
    real bug (`fromGreek(12, 7)` silently returned the wrong verse under
    200) — nine psalms turned out to have a genuine interior content split or
-   merge the title-only model couldn't represent; see the title-structure
-   note above for the full breakdown and `src/psalms.ts`'s
-   `irregularGreekParts` for the per-psalm detail.
-6. **`CorpusExpectations.dropped` has no per-format variant.** See "Where
-   Phase 2 stands" above — a USFM-derived read of the ASV produces 16
+   merge the title-only model couldn't represent; see "Facts that were
+   expensive to establish" above for the psalm-by-psalm summary and
+   `src/psalms.ts`'s `irregularGreekParts` for the per-psalm detail.
+6. **`CorpusExpectations.dropped` has no per-format variant.** See "Phase 2
+   — bring your own text" above — a USFM-derived read of the ASV produces 16
    dropped keys with no USFX counterpart, and `validateCorpus` requires
    exact key-set parity. Not exercised by anything shipped today, so
    inert but real.
 7. **`PARSER_VERSION` was not bumped for the USX misclassification fixes,
    or for the three USFM/USX bugs fixed 10 September** (inline apparatus
    truncation, cross-references filed as notes, unparseable table/figure/
-   periph). See "Where Phase 2 stands" above: neither reader is in the
-   `asv`/`dra` build path today, so their output has no effect on anything
-   published. Revisit the moment either format's `--source` override is
-   actually used to build a shipped edition.
-
----
-
-## Where the 7 September session left off
-
-Seven commits, all deployed and pushed. `bun test` 186 across 12 files,
-`bun run typecheck` clean, `bun run check:contract` 54/54, `bun run
-check:platform` all green.
-
-**Shipped**
-
-- **Request hardening.** Deduplicated and capped query terms at 12; `God`
-  repeated 5,000 times had measured 1.1 s of CPU from a hand-typable URL. Also
-  a 512-character input cap, 64 comma-separated reference segments, and
-  `locate()` turned from a 66-book scan into a binary search.
-- **A rejected guard, kept as reasoning.** Pricing queries from document
-  frequencies and refusing expensive ones cannot work: the costliest query the
-  index can express prices at 135,841 and "and it came to pass in the days of
-  the king" at 99,444. It was also refusing `?q=the`. See the comment on
-  `MAX_QUERY_TERMS`.
-- **`EDITION_ORDER` beside `CANON_ORDER`.** What an edition prints is not what a
-  tradition counts. `src/edition.test.ts` asserts the two *disagree* about
-  Tobit, so a future collapse fails loudly.
-- **`bun run check:platform`.** The platform claims in this file now run.
-- **Exact search totals.** The scan cap was undercounting multi-term results —
-  345 reported as 313 — and raising it to 25,000 is also 4.5x faster there.
-- **`src/translations.ts`.** `?translation=` on `/books`, `/passages`,
-  `/search`, defaulting to `asv`; unknown ids are a 404 naming what is served.
-  Every ASV response verified byte-identical.
-
-**Versification is in the registry — done 8 September 2026.**
-
-`src/versification.ts` derives the sequence tables for one edition from its
-verse counts and book order. `src/translations.ts` holds those per translation
-and memoises the derived tables in `versificationOf(id)`, lazily: cold start
-lands on whichever request an isolate serves first, so an edition nobody asks
-for is never built. `src/parser.ts` no longer imports `VERSE_COUNTS` at all —
-`chapterCount`, `verseCount`, `sequenceOf` and `locate` each take a translation,
-defaulting to the ASV, and ~~`BOOK_START`~~ / ~~`CHAPTER_OFFSET`~~ /
-~~`BOOK_STARTS`~~ are gone as module globals. (Struck through because they no
-longer exist: `src/state.test.ts` treats a struck symbol as deliberately dead
-and every other backticked symbol as one that must still resolve.)
-
-Proven byte-identical: `scripts/snapshot-responses.ts` captures 40 responses
-weighted to book and chapter boundaries, the corpus edges, Psalm
-superscriptions and the out-of-range cases; pre- and post-refactor output
-matched exactly (185,600 bytes). 198 tests, `tsc` clean, `src/data/` untouched
-so neither identifier moved. 31,102 `locate`+`sequenceOf` round trips cost
-17 ms — 0.55 µs each.
-
-**The translation is threaded through the read path — done 8 September 2026.**
-
-`parseReference` takes a `translation` option and forwards it through
-`resolveBook` → `ensureAvailable`, `validateChapter`, `validateVerse` and every
-`sequenceOf` call. All four read handlers in `src/index.ts` pass the id they had
-already resolved.
-
-Two of them were not resolving one at all. `/books/:id` and
-`/books/:id/chapters/:num` ignored `?translation=` and answered from the ASV
-under HTTP 200 — the silent wrong answer the conformance suite records against
-other APIs, in our own code. Both now 404 an unknown id like `/books` and
-`/passages` already did. **This is the one intentional behaviour change**;
-everything else is byte-identical across 50 captured responses.
-
-`src/threading.test.ts` proves the parameter is consumed rather than accepted
-and dropped, which byte-identity cannot: with everything defaulting to the ASV,
-identical output is guaranteed by construction. Each assertion was checked by
-deliberately breaking the threading and confirming it fails. One earlier version
-of the `resolveBook` test survived that check — asserting `parseReference` throws
-for a bogus translation proves nothing, because `chapterCount` throws a moment
-later regardless. A metadata-only book discriminates: `ensureAvailable` throws
-there before `chapterCount` runs, with a different error type.
-
-Still ASV-only: `src/psalms.ts`, `src/data.test.ts` and `scripts/build-data.ts`
-reach for `VERSE_COUNTS` directly, and `src/validate.ts` keeps per-book
-assertions.
-
-`src/psalms.ts` was deliberately left alone. It holds no verse-count table; it
-encodes a tradition — `fromHebrew` maps "to its position in the ASV's English
-text", and `irregularGreekParts` hardcodes the Septuagint mapping (Greek 9 =
-Hebrew 9+10, Greek 113 = Hebrew 114+115). A `translation` parameter there would
-be accepted and then ignored by the logic underneath. For the DRA the premise
-inverts, since Greek numbering is native and `fromGreek` becomes identity. That
-module needs the DRA in hand to design against.
-
-`dataAvailability` is a known half-measure: `ensureAvailable` now names the
-edition from the registry, but the fact it reports comes from `src/canon.ts`,
-where it is derived globally (`isDeuterocanon ? "metadata_only" : "full"`). The
-message can therefore name an edition while stating the ASV's availability.
-Closes when `data_availability` becomes per `(translation, book)`.
-
-Then `build:data` and `validate.ts` need to run per translation — both currently
-hard-code the ASV source URL — and the DRA data can be generated. Its archive is
-already verified: 2,946,666 bytes, sha256 `9dfbc526d699e9e461d0a8419c60dd12390e8618af7ac3e97083ae5e53e2ed29`,
-and ingest tolerating a source with **no `<d>` titles and no footnotes** is the
-one parser change the DRA actually needs.
-
-**Use `lcr find` to locate code, then `lcr read` to understand it.**
-`lcr find` answers in ~0.05 s. `lcr read --question "..." --paths FILE [FILE
-...]` names the files itself and returns only the answer — prefer it to
-`lcr ask`, which has to guess which files matter. The whole pipeline works now:
-the worker moved off a 3B local model onto `gpt-oss:120b-cloud`, so the note
-that `ask` and `inspect` time out on this hardware no longer holds.
+   periph). See "Phase 2 — bring your own text" above: neither reader is in
+   the `asv`/`dra` build path today, so their output has no effect on
+   anything published. Revisit the moment either format's `--source`
+   override is actually used to build a shipped edition.
 
 ---
 
