@@ -232,6 +232,43 @@ export const DEMO_HTML = `<!doctype html>
   .request .meta { margin-inline-start: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .request[data-status="error"] code { color: var(--color-danger); }
 
+  /* Static reference material: an endpoint list and a response body, not a live request. */
+  .endpoints { --flow-space: var(--space-1); }
+  .endpoint {
+    display: flex; flex-wrap: wrap;
+    inline-size: 100%;
+    gap: var(--space-2) var(--space-3);
+    align-items: baseline;
+    padding-block: var(--space-2);
+    padding-inline: 0;
+    border: none;
+    border-block-end: 1px solid var(--color-border);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-xs);
+  }
+  .endpoint code { color: var(--color-text-primary); }
+  .endpoint .meta { margin-inline-start: auto; font-family: var(--font-family-sans); color: var(--color-text-secondary); text-align: end; }
+  .endpoint:hover, .endpoint:focus-visible { background-color: var(--color-accent-quiet); }
+  .endpoint:hover code, .endpoint:focus-visible code { color: var(--color-accent); }
+
+  .codeblock {
+    padding: var(--space-4);
+    background-color: var(--color-surface-sunken);
+    border-radius: var(--radius-md);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-normal);
+    color: var(--color-text-secondary);
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .codeblock code { color: var(--color-text-primary); }
+
   .result-heading { font-family: var(--font-family-serif); font-size: var(--font-size-lg); font-style: italic; color: var(--color-text-secondary); }
 
   .verses { --flow-space: var(--space-3); max-inline-size: var(--measure-scripture); }
@@ -283,7 +320,7 @@ export const DEMO_HTML = `<!doctype html>
   .is-busy { opacity: 0.55; }
   @media (prefers-reduced-motion: no-preference) {
     .result { transition: opacity var(--duration-fast) var(--easing-standard); }
-    .button, .control { transition: border-color var(--duration-fast) var(--easing-standard), background-color var(--duration-fast) var(--easing-standard); }
+    .button, .control, .endpoint { transition: border-color var(--duration-fast) var(--easing-standard), background-color var(--duration-fast) var(--easing-standard), color var(--duration-fast) var(--easing-standard); }
   }
 
   .skip-link { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); }
@@ -316,6 +353,43 @@ export const DEMO_HTML = `<!doctype html>
 </header>
 
 <main class="shell sections">
+
+  <section class="stack" id="developers" aria-labelledby="h-developers">
+    <h2 id="h-developers">For developers</h2>
+    <p class="prose">
+      Plain HTTP, JSON back, no key and no signup. Every route below takes an
+      optional <code>?translation=</code> &mdash; <code>asv</code> (default) or
+      <code>dra</code>. The full contract, including error shapes, is at
+      <a href="/openapi.yaml">/openapi.yaml</a>.
+    </p>
+
+    <div class="stack endpoints" id="dev-endpoints">
+      <button class="endpoint" type="button" data-path="/passages?ref=John+3:16"><code>GET /passages?ref=John+3:16</code><span class="meta">a reference, parsed and bounds-checked</span></button>
+      <button class="endpoint" type="button" data-path="/search?q=good+shepherd&amp;limit=20"><code>GET /search?q=good+shepherd&amp;limit=20</code><span class="meta">full text, every term required</span></button>
+      <button class="endpoint" type="button" data-path="/books?tradition=catholic"><code>GET /books?tradition=catholic</code><span class="meta">protestant, catholic, or orthodox_greek</span></button>
+      <button class="endpoint" type="button" data-path="/books/JHN"><code>GET /books/JHN</code><span class="meta">one book's canon metadata</span></button>
+      <button class="endpoint" type="button" data-path="/books/JHN/chapters/3"><code>GET /books/JHN/chapters/3</code><span class="meta">one chapter, verse by verse</span></button>
+      <button class="endpoint" type="button" data-path="/health"><code>GET /health</code><span class="meta">REVISION_ID and GENERATION_ID for this build</span></button>
+    </div>
+
+    <p class="prose">
+      Click a route to run it against this deployment, right here &mdash; the
+      same request as <code>curl "$HOST"</code> plus the path, and the same
+      JSON back, unedited.
+    </p>
+
+    <p class="request" id="dev-request"><code>GET /passages?ref=John+3:16</code></p>
+    <pre class="codeblock" id="dev-result" aria-live="polite" aria-busy="false"><code id="dev-result-body">{
+  "reference": "John 3:16",
+  "translation": { "id": "asv", "name": "American Standard Version", "language": "en", "license": "Public Domain", "year": 1901 },
+  "numbering": "english",
+  "verses": [
+    { "id": "JHN.3.16", "book": "JHN", "chapter": 3, "verse": 16,
+      "text": "For God so loved the world, that he gave his only begotten Son, that whosoever believeth on him should not perish, but have eternal life.",
+      "note": null }
+  ]
+}</code></pre>
+  </section>
 
   <section class="stack" id="passages" aria-labelledby="h-passages">
     <h2 id="h-passages">Passages</h2>
@@ -518,6 +592,31 @@ export const DEMO_HTML = `<!doctype html>
     box.appendChild(make("b", null, String(outcome.status) + " " + (outcome.body.error || "error")));
     box.appendChild(document.createTextNode(outcome.body.detail || "The request failed."));
     region.appendChild(box);
+  }
+
+  /* Developer quickstart --------------------------------------------------
+     A generic runner: each button names the path it hits, and every one
+     shares a single request/result pair rather than getting its own form. */
+
+  var devEndpoints = el("dev-endpoints");
+  var devRequest = el("dev-request");
+  var devResult = el("dev-result");
+  var devResultBody = el("dev-result-body");
+
+  if (devEndpoints) {
+    devEndpoints.addEventListener("click", function (event) {
+      var button = event.target.closest("button[data-path]");
+      if (!button) { return; }
+      var path = button.dataset.path;
+
+      showRequest(devRequest, path, null);
+      busy(devResult, true);
+      call(path).then(function (outcome) {
+        busy(devResult, false);
+        showRequest(devRequest, path, outcome);
+        devResultBody.textContent = JSON.stringify(outcome.body, null, 2);
+      });
+    });
   }
 
   /* Passages ------------------------------------------------------------- */
