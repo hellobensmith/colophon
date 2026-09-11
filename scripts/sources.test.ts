@@ -64,6 +64,8 @@ describe("a directory of per-book files, as a DBL bundle ships them", () => {
 
 describe("it refuses rather than guessing", () => {
   test("a path that does not exist says so, and says what is accepted", async () => {
+    // bun-types declares .rejects.toThrow() as returning void; it's genuinely async at runtime.
+    // oxlint-disable-next-line typescript/await-thenable
     await expect(readLocal(path.join(dir, "nope"))).rejects.toThrow(/No such source/);
   });
 
@@ -71,6 +73,8 @@ describe("it refuses rather than guessing", () => {
     const empty = path.join(dir, "empty");
     await mkdir(empty, { recursive: true });
     await Bun.write(path.join(empty, "readme.txt"), "hello");
+    // bun-types declares .rejects.toThrow() as returning void; it's genuinely async at runtime.
+    // oxlint-disable-next-line typescript/await-thenable
     await expect(readLocal(empty)).rejects.toThrow(/no \.usx, \.usfm/);
   });
 

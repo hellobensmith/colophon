@@ -12,7 +12,11 @@
     "check:contract": "bun scripts/check-contract.ts",
     "check:platform": "bun scripts/check-platform.ts",
     "conformance": "bun conformance/run.ts",
-    "build:openapi": "bun scripts/embed-openapi.ts"
+    "build:openapi": "bun scripts/embed-openapi.ts",
+    "lint:fast": "oxlint",
+    "lint:types": "oxlint --type-aware",
+    "lint": "bun run lint:fast && bun run lint:types",
+    "postinstall": "git config core.hooksPath .githooks 2>/dev/null || echo 'hooks: skipped (not a git checkout)'"
   },
   "dependencies": {
     "hono": "4.13.5"
@@ -20,6 +24,8 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250109.0",
     "@types/bun": "^1.4.0",
+    "oxlint": "1.82.0",
+    "oxlint-tsgolint": "7.0.2001",
     "typescript": "7.0.2",
     "wrangler": "4.128.0"
   }

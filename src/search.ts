@@ -111,7 +111,7 @@ function indexFor(translation: string = DEFAULT_TRANSLATION): SearchIndex {
     translation,
     lines,
     tokens,
-    postings: new Array<Int32Array | undefined>(lines.length),
+    postings: Array.from<Int32Array | undefined>({ length: lines.length }),
     wordLengths,
     docFrequency: decodeDeltas(source.docFrequencies, source.tokenCount),
     families,

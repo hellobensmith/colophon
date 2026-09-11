@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["import", "typescript", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "import/no-cycle": "error",
+    "typescript/no-unsafe-type-assertion": "warn",
+    "typescript/no-unnecessary-type-assertion": "warn",
+    "typescript/require-array-sort-compare": "warn",
+    "typescript/consistent-return": "warn"
+  },
+  "ignorePatterns": ["src/data/**", ".cache/**", ".wrangler/**", "node_modules/**"]
+}

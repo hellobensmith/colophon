@@ -96,6 +96,8 @@ describe("resumable download", () => {
 
   test("gives up after the attempt limit instead of looping forever", async () => {
     const server = truncatingFetch({ chunkSize: 100, failures: 99 });
+    // bun-types declares .rejects.toThrow() as returning void; it's genuinely async at runtime.
+    // oxlint-disable-next-line typescript/await-thenable
     await expect(
       downloadWithResume("https://example.test/file.zip", {
         fetchImpl: server.impl,
@@ -127,6 +129,8 @@ describe("resumable download", () => {
       return new Response(body, { status: 200 });
     }) as unknown as typeof fetch;
 
+    // bun-types declares .rejects.toThrow() as returning void; it's genuinely async at runtime.
+    // oxlint-disable-next-line typescript/await-thenable
     await expect(
       downloadWithResume("https://example.test/file.zip", { fetchImpl: impl }),
     ).rejects.toThrow(/ignored a Range request/);
@@ -134,6 +138,8 @@ describe("resumable download", () => {
 
   test("rejects a source that reports no content-length", async () => {
     const impl = (async () => new Response(null, {})) as unknown as typeof fetch;
+    // bun-types declares .rejects.toThrow() as returning void; it's genuinely async at runtime.
+    // oxlint-disable-next-line typescript/await-thenable
     await expect(expectedSize("https://example.test/file.zip", impl)).rejects.toThrow(
       DownloadError,
     );
@@ -141,6 +147,8 @@ describe("resumable download", () => {
 
   test("surfaces a failed HEAD", async () => {
     const impl = (async () => new Response(null, { status: 503 })) as unknown as typeof fetch;
+    // bun-types declares .rejects.toThrow() as returning void; it's genuinely async at runtime.
+    // oxlint-disable-next-line typescript/await-thenable
     await expect(expectedSize("https://example.test/file.zip", impl)).rejects.toThrow(/503/);
   });
 });
