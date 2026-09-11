@@ -50,6 +50,16 @@ export interface CorpusExpectations {
   readonly books: ReadonlyMap<string, { chapters: number; verses: number }>;
   /** Verses printed as numbered placeholders with no text, carrying a note. */
   readonly emptyVerses: readonly string[];
+  /**
+   * Verses a source omits outright — no placeholder, no number, nothing —
+   * rather than printing empty (contrast {@link emptyVerses}). A critical
+   * edition can genuinely lack a verse a majority-text-based edition prints;
+   * synthesizing a placeholder to satisfy verse-contiguity would fabricate a
+   * coordinate the source doesn't have. Declared explicitly so an
+   * undeclared gap still fails loud — this is an escape hatch for a real,
+   * asserted absence, not a way to silence the contiguity check generally.
+   */
+  readonly omittedVerses: readonly string[];
   /** Chapter superscriptions, all of which must sit in the Psalter. */
   readonly titleCount: number;
   /** Chapters closing with a line printed below the last verse. */
@@ -157,14 +167,25 @@ export function validateCorpus(
     if (seen.has(verse.bcv)) failures.push(`${verse.bcv}: duplicate verse`);
     seen.add(verse.bcv);
   }
+  const omitted = new Set(expected.omittedVerses);
+  const highestVerse = new Map<string, number>();
+  for (const verse of doc.verses) {
+    const key = `${verse.book}.${verse.chapter}`;
+    highestVerse.set(key, Math.max(highestVerse.get(key) ?? 0, verse.verse));
+  }
   for (const [bookId, chapters] of byBook) {
-    for (const [chapter, count] of chapters) {
-      for (let verse = 1; verse <= count; verse += 1) {
-        if (!seen.has(`${bookId}.${chapter}.${verse}`)) {
-          failures.push(`${bookId}.${chapter}.${verse}: gap in verse numbering`);
+    for (const chapter of chapters.keys()) {
+      const highest = highestVerse.get(`${bookId}.${chapter}`) ?? 0;
+      for (let verse = 1; verse <= highest; verse += 1) {
+        const bcv = `${bookId}.${chapter}.${verse}`;
+        if (!seen.has(bcv) && !omitted.has(bcv)) {
+          failures.push(`${bcv}: gap in verse numbering`);
         }
       }
     }
+  }
+  for (const bcv of omitted) {
+    if (seen.has(bcv)) failures.push(`${bcv}: declared omitted but present in the source`);
   }
 
   const empty = doc.verses.filter((verse) => verse.text === "").map((verse) => verse.bcv);

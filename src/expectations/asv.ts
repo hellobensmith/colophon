@@ -147,6 +147,8 @@ export const ASV: CorpusExpectations = {
   totalVerses: EXPECTED_TOTAL_VERSES,
   books: EXPECTED_BOOKS,
   emptyVerses: EXPECTED_EMPTY_VERSES,
+  // The ASV numbers and empties these verses rather than omitting them.
+  omittedVerses: [],
   titleCount: EXPECTED_TITLE_COUNT,
   subscriptions: EXPECTED_SUBSCRIPTIONS,
   // The 16 omitted verses each carry an explanatory footnote.

@@ -16,6 +16,7 @@ import type { EditionId } from "../src/canon.ts";
 import type { CorpusExpectations } from "../src/validate.ts";
 import { ASV } from "../src/expectations/asv.ts";
 import { DRA } from "../src/expectations/dra.ts";
+import { SBLGNT } from "../src/expectations/sblgnt.ts";
 
 export interface BuildEdition {
   /** Registry id, and the directory the artifacts are written to. */
@@ -50,6 +51,14 @@ const EDITIONS: readonly BuildEdition[] = [
     id: "dra",
     sourceId: "engDRA",
     expectations: DRA,
+  },
+  {
+    id: "sblgnt",
+    // Not an eBible archive id — this edition has none, and is only ever
+    // built via `--source`. Still becomes the published EDITION_ID, so it's
+    // a real, meaningful name rather than a placeholder.
+    sourceId: "sblgnt",
+    expectations: SBLGNT,
   },
 ];
 

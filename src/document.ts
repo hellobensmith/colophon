@@ -63,6 +63,16 @@ export interface ScriptureDocument {
   readonly subscriptions: ReadonlyMap<string, string>;
   /** Canonical book ids in document order, excluding front/back matter. */
   readonly books: readonly string[];
+  /**
+   * Text that belongs between two verses rather than inside either one —
+   * e.g. Mark's Shorter Ending, printed between 16:8 and 16:9 with no verse
+   * number of its own. Keyed by the verse it follows ("MRK.16.8"). Appending
+   * text like this onto the preceding verse would silently and substantially
+   * misrepresent that verse's actual content; this field exists so a reader
+   * never has to make that choice by default. Empty for every edition that
+   * doesn't carry one.
+   */
+  readonly interpolations: ReadonlyMap<string, string>;
   /** Proof that no source text disappeared silently. See {@link CoverageLedger}. */
   readonly ledger: CoverageLedger;
 }

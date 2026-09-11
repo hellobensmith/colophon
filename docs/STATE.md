@@ -19,13 +19,20 @@ Git history is the record of what changed.
 
 ## What exists
 
-**A deployed API serving two editions.**
-<https://colophon.hellobensmith.workers.dev> — the ASV 1901 (31,102 verses) and
-the Douay-Rheims (35,811 verses, 73 books), both embedded in a Cloudflare
-Worker with no database. Reference parsing, three canon traditions, Hebrew and
-Greek psalm numbering, a demo page at `/`. Search covers both editions, each
-from its own index, and returns 501 for a translation with none rather than
-answering from the wrong index.
+**A deployed API serving three editions.**
+<https://colophon.hellobensmith.workers.dev> — the ASV 1901 (31,102 verses),
+the Douay-Rheims (35,811 verses, 73 books), and the SBL Greek New Testament
+(7,939 verses, 27 books, CC BY 4.0), all embedded in a Cloudflare Worker with
+no database. Reference parsing, three canon traditions, Hebrew and Greek
+psalm numbering, a demo page at `/`. Search covers the two English editions,
+each from its own index, and returns 501 for a translation with none rather
+than answering from the wrong index — the SBLGNT included, deliberately:
+Greek needs its own tokenizer, not attempted yet. `GET /translations` reports
+each edition's real, derived capabilities (search, apparatus, testaments,
+psalm numbering) so a generic client can discover them rather than guess.
+`GET /apparatus` serves the SBLGNT's critical apparatus — a collation of
+printed editions (WH, Tregelles, NA27/NA28, RP, and occasionally others),
+not manuscripts.
 
 **A conformance suite.** `conformance/` — asks seven public Scripture APIs the
 same semantic questions and writes a capability matrix. Published for
@@ -44,7 +51,7 @@ to make it pass, which fails too.
 | DRA verses | 35,811 |
 | DRA books | 73 |
 | Books with metadata only | 10 |
-| Registered translations | asv, dra |
+| Registered translations | asv, dra, sblgnt |
 | REVISION_ID | 365da92d6d9b… |
 | GENERATION_ID | 1f4166f15db9… |
 
@@ -187,6 +194,45 @@ changes no measured verdict, only the provenance label. Separately,
 `/search` but not on `/books/{id}` or `/books/{id}/chapters/{num}`, even
 though every route accepts it — fixed, embedded copy regenerated with
 `bun run build:openapi`.
+
+**11 September 2026: a fourth format, and the first edition built entirely
+through `--source` — the SBL Greek New Testament, text and apparatus.**
+Plan drafted, then red-teamed by three independent audits (a tradition-
+neutral NT textual critic, a digital-Bible-format specialist, an API
+architect) before a line of `src/sblgnt.ts` was written; the audits caught
+real defects a synopsis-level read of one book (Jude) couldn't have — see
+"Facts that were expensive to establish" below.
+
+New format `sblgnt` (`src/format.ts`, `src/sblgnt.ts`): SBL's own bespoke
+XML, not USFM/USX/OSIS. Verified character-exact against the source's own
+`data/sblgnt/text/*.txt` across all 7,939 verses. `ScriptureDocument` grew
+two fields for it, both currently empty for every other edition:
+`interpolations` (text between two named verses with no verse number of
+its own — Mark's Shorter Ending is the one real case) and
+`CorpusExpectations.omittedVerses` (verses a source drops outright, no
+placeholder — 15 of them here, contrast `emptyVerses`, which the ASV
+already used for verses it numbers-and-empties).
+
+A separate, structured critical apparatus (`src/sblgnt-apparatus.ts`,
+`scripts/build-sblgnt-apparatus.ts`) — 6,934 notes, split on the one `]`
+every note genuinely has, deliberately *not* decomposed further into
+per-witness fields; see the open question below for why. Served at
+`GET /apparatus`, gated the same way `/search` already gates an edition
+with no index (`501`/`not_implemented` — which surfaced a real, separate
+pre-existing bug: that error code was never in `openapi.yaml`'s enum even
+though the search and psalm-numbering paths already used it; fixed, and
+both now have contract-test coverage for the first time).
+
+New `GET /translations`: every registered edition's capabilities
+(search, apparatus, testaments, psalm numbering), all derived from the
+same registries the routes gate on rather than hand-maintained — the
+SBLGNT is the first edition whose capabilities genuinely differ from
+every other one's, which is what exposed that this never existed.
+
+`TranslationMeta` grew `license_url`/`attribution`, snake_case on the TS
+interface itself (not the usual camelCase) because `src/index.ts` spreads
+`translation.meta` directly into API responses with no transform layer —
+the field name *is* the wire key.
 
 ---
 
@@ -347,6 +393,40 @@ John 3:1 and `Genesis 99:1` returning Genesis 1:1, both under HTTP 200. Four of
 the six external APIs do no reference parsing at all. Full matrix in
 `conformance/report.md`.
 
+**The SBLGNT's join algorithm was never actually specified by the source,
+and the obvious naive read is wrong.** 85% of `<suffix>` elements are
+empty; the XML's own pretty-printed indentation is not the word separator.
+The real rule — a `prefix? + w` unit's leading whitespace *is* the
+separator, stripped only if the output already ends in whitespace;
+`suffix` always appends raw, never through that logic; a `<p>` boundary
+mid-verse contributes one more space — reconstructs all 7,939 verses
+character-exact against the source's own `data/sblgnt/text/*.txt`, which
+nobody had used as ground truth before. See the doc comment on
+`src/sblgnt.ts`.
+
+**The SBLGNT disagrees with the ASV's own New Testament versification in
+9 of 27 books — not a defect.** Romans ends at 16:24 *with text* (the
+Byzantine closing) and has no 16:25-27 — NA28/WH/Tregelles's doxology
+sits in the apparatus, not the text, siding with the Byzantine tradition
+against the critical editions at Paul's most-discussed structural crux.
+Acts 19:41 folds into the ASV's 19:41 being NA/SBL's own 19:40 — a moved
+boundary, nothing missing. 3 John and Revelation 12 run the other way (3
+John splits the ASV's v14 into 14+15; Revelation 12 has 18 verses because
+NA/SBL's 12:18 is the ASV's 13:1). And 15 verses the ASV numbers-and-
+empties, the SBLGNT omits outright — no placeholder, no number at all
+(`src/expectations/sblgnt.ts`'s `omittedVerses`). A validation gate that
+treated any of this as a bug to fix would have fabricated or deleted real
+text-critical content — this is exactly why `validateCorpus`'s ASV
+cross-check for this edition is diagnostic only, never a pass/fail gate.
+
+**The apparatus is a collation of printed editions, not manuscripts.**
+Every siglum across all 6,934 notes, inventoried directly: `WH, Treg,
+Tregmarg, NA27, NA28, RP, NIV, Holmes, TR, SBL, WHapp, WHmarg, ⟦WH⟧` — 13
+distinct tokens, zero papyri, uncials, minuscules, versional or patristic
+witnesses anywhere. Say so wherever this is served; a scholar who assumes
+manuscript support and doesn't find it will conclude the project doesn't
+know what an apparatus is.
+
 ---
 
 ## Traps that already cost time
@@ -463,6 +543,36 @@ which text it is holding. Repo, Worker, package and docs all renamed; the old
    the `asv`/`dra` build path today, so their output has no effect on
    anything published. Revisit the moment either format's `--source`
    override is actually used to build a shipped edition.
+8. **The apparatus's readings aren't decomposed into per-witness fields.**
+   Attempted, and abandoned on real evidence, not caution for its own sake:
+   Matt 11:9/19:17 and John 18:21 are multi-part word-order transpositions
+   sharing one trailing witness list across `;`-joined clauses; Mark 9:38
+   cites "Greeven," a named conjecture no siglum list had; Mark 16:8 has a
+   witness with trailing punctuation (`NIV.`); John 7:52 embeds the entire
+   Pericope Adulterae as a quoted reading with no witness of its own. A
+   `witnesses: string[]` field that silently mis-split any of these would
+   misrepresent a scholar's own apparatus entry. `lemma`/`readings` stay
+   plain strings, `raw` alongside regardless — see `src/sblgnt-apparatus.ts`.
+9. **No second Greek edition yet.** The textual-critic audit's strongest
+   recommendation: Robinson-Pierpont's Byzantine Textform, freely licensed,
+   would turn "an API serving one eclectic critical text" into the only
+   place to diff Greek textual traditions programmatically — RP already
+   sits inside the SBLGNT's own apparatus as one of its four base editions
+   (56 places SBLGNT follows RP alone against WH/Treg/NA28), so the
+   scholarly case is already half-made by data this project already holds.
+   Not decided, not started — Ben's call, not bundled into this work.
+10. **MorphGNT's lemma/parsing tagging of this exact text is unverified.**
+    Believed to exist as a free, separate companion dataset (James Tauber);
+    not checked this session (no network access during the audit that
+    raised it). If it holds up, "no morphology" (true of the SBLGNT-src
+    download alone) stops being an ecosystem gap and becomes a real,
+    scoped follow-up ingest.
+11. **Greek-aware search stays out of scope**, on purpose, matching the
+    roadmap's own Phase 05: `src/tokenize.ts`'s folding and `[^a-z]+`
+    splitting sends every polytonic Greek character to the separator
+    class, tokenizing the whole SBLGNT to zero tokens as written. `sblgnt`
+    registers with no search index and relies on the existing per-edition
+    gate rather than shipping a half-built tokenizer.
 
 ---
 

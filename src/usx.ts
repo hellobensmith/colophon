@@ -391,6 +391,7 @@ export function parseUsx(xml: string): UsfmDocument {
     titles,
     subscriptions,
     books,
+    interpolations: new Map(),
     format: "usx",
     ledger: {
       toVerses,

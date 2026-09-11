@@ -17,6 +17,8 @@ import * as asvText from "./data/asv/text.ts";
 import * as asvMeta from "./data/asv/meta.ts";
 import * as draText from "./data/dra/text.ts";
 import * as draMeta from "./data/dra/meta.ts";
+import * as sblgntText from "./data/sblgnt/text.ts";
+import * as sblgntMeta from "./data/sblgnt/meta.ts";
 import { locate, sequenceOf } from "./parser.ts";
 import { UnknownTranslationError } from "./translations.ts";
 
@@ -76,6 +78,17 @@ const MODULES: Readonly<Record<string, EditionModules>> = {
     revisionId: draMeta.REVISION_ID,
     generationId: draMeta.GENERATION_ID,
     editionId: draMeta.EDITION_ID,
+  },
+  sblgnt: {
+    text: sblgntText.TEXT,
+    lengths: sblgntText.LENGTHS,
+    verseCount: sblgntText.VERSE_COUNT,
+    titles: sblgntMeta.TITLES,
+    subscriptions: sblgntMeta.SUBSCRIPTIONS,
+    notes: sblgntMeta.NOTES,
+    revisionId: sblgntMeta.REVISION_ID,
+    generationId: sblgntMeta.GENERATION_ID,
+    editionId: sblgntMeta.EDITION_ID,
   },
 };
 

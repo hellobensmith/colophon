@@ -51,6 +51,7 @@ const BASE: CorpusExpectations = {
     ["EXO", { chapters: 1, verses: 1 }],
   ]),
   emptyVerses: [],
+  omittedVerses: [],
   titleCount: 0,
   subscriptions: [],
   expectsNotes: false,

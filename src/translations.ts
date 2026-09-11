@@ -30,6 +30,7 @@
 import { EDITION_ORDER } from "./canon.ts";
 import { VERSE_COUNTS as ASV_VERSE_COUNTS } from "./data/asv/meta.ts";
 import { VERSE_COUNTS as DRA_VERSE_COUNTS } from "./data/dra/meta.ts";
+import { VERSE_COUNTS as SBLGNT_VERSE_COUNTS } from "./data/sblgnt/meta.ts";
 import { buildVersification, type Versification } from "./versification.ts";
 
 export const DEFAULT_TRANSLATION = "asv";
@@ -40,11 +41,31 @@ export interface TranslationSource {
   readonly format: string;
 }
 
+/**
+ * Serialized directly — `src/index.ts` returns `translation: translation.meta`
+ * with no transform layer — so every field name here *is* its JSON key.
+ * `license_url`/`attribution` are snake_case for that reason: they must match
+ * this API's existing wire convention (`chapters_count`, `data_availability`),
+ * not TypeScript's own.
+ */
 export interface TranslationMeta {
   readonly id: string;
   readonly name: string;
   readonly language: string;
   readonly license: string;
+  /**
+   * Where the license's own terms are published. Optional because a public-
+   * domain text has no terms to link to; required in spirit for anything
+   * that does — CC BY 4.0 conditions attribution on exactly this kind of
+   * reference, so it isn't decoration.
+   */
+  readonly license_url?: string;
+  /**
+   * The credit a conditional license requires, carried as data rather than
+   * left to a metadata endpoint a caller may never call — CC BY 4.0 is an
+   * attribution license, not a courtesy notice.
+   */
+  readonly attribution?: string;
   readonly year: number;
 }
 
@@ -124,6 +145,34 @@ const DRA: Translation = {
   psalmSchemes: ["greek"],
 };
 
+const SBLGNT: Translation = {
+  meta: {
+    id: "sblgnt",
+    name: "SBL Greek New Testament",
+    language: "grc",
+    license: "CC BY 4.0",
+    license_url: "https://creativecommons.org/licenses/by/4.0/",
+    attribution:
+      "SBL Greek New Testament, edited by Michael W. Holmes, " +
+      "© 2010 Society of Biblical Literature and Logos Bible Software.",
+    // The edition text's own version (v1.2, 2023-07-10 — it added the
+    // Pericope Adulterae), not the 2010 copyright year the attribution
+    // string above carries. The two are different facts about this text.
+    year: 2023,
+  },
+  source: {
+    name: "SBLGNT.com",
+    url: "https://sblgnt.com",
+    format: "SBLGNT XML",
+  },
+  editionId: "sblgnt",
+  verseCounts: SBLGNT_VERSE_COUNTS,
+  order: EDITION_ORDER.sblgnt,
+  // A critical Greek text, not a translation numbered against the Hebrew or
+  // Greek Psalter — the numbering question this field answers doesn't apply.
+  psalmSchemes: [],
+};
+
 /**
  * Registered in the order they should be offered. The ASV is first because it
  * is the default, not because it is privileged.
@@ -131,6 +180,7 @@ const DRA: Translation = {
 export const TRANSLATIONS: ReadonlyMap<string, Translation> = new Map([
   [ASV.meta.id, ASV],
   [DRA.meta.id, DRA],
+  [SBLGNT.meta.id, SBLGNT],
 ]);
 
 export const TRANSLATION_IDS: readonly string[] = [...TRANSLATIONS.keys()];

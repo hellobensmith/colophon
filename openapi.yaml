@@ -3,9 +3,12 @@ info:
   title: Colophon
   version: 1.0.0
   description: |
-    Two public-domain editions, served from Cloudflare Workers: the American
-    Standard Version (1901) and the Douay-Rheims. Both corpora are embedded in
-    the Worker, so no request performs any I/O.
+    Three editions, served from Cloudflare Workers: the American Standard
+    Version (1901, public domain), the Douay-Rheims (public domain), and the
+    SBL Greek New Testament (CC BY 4.0 — see each translation's own `license`
+    and `license_url`, not this document's top-level license, which covers
+    the API's own description and schema only). All three corpora are
+    embedded in the Worker, so no request performs any I/O.
 
     Every response names the translation it came from, and carries the edition,
     revision and generation identifiers of that text. Pass ?translation= to
@@ -13,16 +16,19 @@ info:
     default.
 
     Versification belongs to the edition, not to the canon. Of the 66 books the
-    two share, 32 are numbered differently — so a verse coordinate is only
-    meaningful paired with a translation.
+    ASV and Douay-Rheims share, 32 are numbered differently — so a verse
+    coordinate is only meaningful paired with a translation. The SBLGNT
+    disagrees with the ASV's own New Testament versification in 9 of its 27
+    books, for the same reason: different textual traditions, not an error.
 
     Canon awareness: every book carries its position in the Protestant (66),
     Catholic (73), and Orthodox Greek (76) canons. The ASV contains no
     deuterocanonical text, so those books are metadata only there; the
-    Douay-Rheims supplies seven of them.
+    Douay-Rheims supplies seven of them. The SBLGNT is New Testament only, so
+    every Old Testament book is metadata only for it.
   license:
-    name: Public Domain
-    url: https://ebible.org/asv/
+    name: See each translation's own license
+    url: https://github.com/hellobensmith/colophon
 
 servers:
   - url: https://colophon.hellobensmith.workers.dev
@@ -429,7 +435,7 @@ components:
       properties:
         error:
           type: string
-          enum: [bad_request, not_found, payload_too_large, internal_error]
+          enum: [bad_request, not_found, payload_too_large, not_implemented, internal_error]
         detail: { type: string }
 
     Translation:
@@ -437,10 +443,20 @@ components:
       required: [id, name, language, license, year]
       additionalProperties: false
       properties:
-        id: { type: string, enum: [asv, dra] }
+        id: { type: string, enum: [asv, dra, sblgnt] }
         name: { type: string }
         language: { type: string }
         license: { type: string }
+        license_url:
+          type: string
+          description: >-
+            Where this edition's license terms are published. Present when the
+            license is conditional (e.g. CC BY 4.0); absent for public domain.
+        attribution:
+          type: string
+          description: >-
+            The credit a conditional license requires. Present alongside
+            license_url; absent for public domain.
         year: { type: integer }
 
     Book:

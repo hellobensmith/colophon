@@ -12,6 +12,7 @@ import type { ScriptureDocument } from "./document.ts";
 import { parseUsfx } from "./usfx.ts";
 import { parseUsfm } from "./usfm.ts";
 import { parseUsx } from "./usx.ts";
+import { parseSblgnt } from "./sblgnt.ts";
 import { detectFormat, type ScriptureFormat } from "./format.ts";
 
 export function parseSource(text: string, format?: ScriptureFormat): ScriptureDocument {
@@ -23,5 +24,7 @@ export function parseSource(text: string, format?: ScriptureFormat): ScriptureDo
       return parseUsx(text);
     case "usfm":
       return parseUsfm(text);
+    case "sblgnt":
+      return parseSblgnt(text);
   }
 }

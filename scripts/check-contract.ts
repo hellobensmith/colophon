@@ -160,6 +160,12 @@ const ERRORS: readonly (readonly [string, number])[] = [
   ["/search?q=love&translation=kjv", 404],
   ["/books?translation=nonsense", 404],
   ["/nope", 404],
+  // 501: a real capability gap, not an error in the request. Previously
+  // unexercised by this suite even though both paths already existed —
+  // `not_implemented` wasn't even in the spec's error enum until SBLGNT
+  // exposed the gap by being the first edition to actually need it.
+  ["/search?q=beginning&translation=sblgnt", 501],
+  ["/passages?ref=Psalm%2050:2&numbering=hebrew&translation=dra", 501],
 ];
 
 for (const [url, specPath] of SUCCESSES) {

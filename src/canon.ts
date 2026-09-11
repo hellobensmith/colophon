@@ -230,7 +230,7 @@ export const CANON_ORDER: Readonly<Record<Tradition, readonly string[]>> = {
  * was asked. So each is carried on its own terms, which is the same commitment
  * the identity headers make about the text itself.
  */
-export type EditionId = "asv" | "dra";
+export type EditionId = "asv" | "dra" | "sblgnt";
 
 const PROTESTANT_OLD_TESTAMENT: readonly string[] = PROTESTANT_ROWS.filter(
   (row) => row[2] === "OT",
@@ -246,9 +246,15 @@ const DRA_DEUTEROCANON: readonly string[] = ["TOB", "JDT", "WIS", "SIR", "BAR", 
 export const EDITION_ORDER: Readonly<Record<EditionId, readonly string[]>> = {
   asv: PROTESTANT_ORDER,
   dra: [...PROTESTANT_OLD_TESTAMENT, ...DRA_DEUTEROCANON, ...NEW_TESTAMENT_ORDER],
+  // Greek, New Testament only — the 39 Old Testament books simply aren't in
+  // this edition's own order, the same way DRA's order omits nothing: an
+  // edition's order is what it actually prints, not the full canon it
+  // belongs to. `dataAvailabilityOf` already reports every absent OT book
+  // as metadata_only from this alone, with no special-casing needed.
+  sblgnt: NEW_TESTAMENT_ORDER,
 };
 
-export const EDITIONS: readonly EditionId[] = ["asv", "dra"];
+export const EDITIONS: readonly EditionId[] = ["asv", "dra", "sblgnt"];
 
 export function isEdition(value: string): value is EditionId {
   return (EDITIONS as readonly string[]).includes(value);

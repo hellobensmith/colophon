@@ -21,8 +21,8 @@ const passage = (ref: string, translation: string) =>
   get(`/passages?ref=${encodeURIComponent(ref)}&translation=${translation}`);
 
 describe("both editions are registered and embedded", () => {
-  test("the registry serves two", () => {
-    expect([...TRANSLATION_IDS].sort()).toEqual(["asv", "dra"]);
+  test("the registry serves three", () => {
+    expect([...TRANSLATION_IDS].sort()).toEqual(["asv", "dra", "sblgnt"]);
   });
 
   test("each carries its own identity, and they differ", () => {
@@ -158,19 +158,31 @@ describe("the invisible case, which is the one that matters", () => {
   });
 });
 
-describe("every registered edition can actually be searched", () => {
-  // The 501 path is unreachable while every registered translation has an index
-  // embedded, and that is the point: the guard exists so a future edition
-  // registered without one is refused rather than answered from a neighbour’s
-  // postings. This asserts the invariant, not the error page.
-  test("nothing is registered that search cannot serve", async () => {
+describe("search covers what it claims to, and refuses what it doesn't", () => {
+  // SBLGNT breaks the old "everything registered is searchable" invariant on
+  // purpose — Greek needs its own tokenizer, deliberately not attempted yet
+  // (see docs/STATE.md) — so the real invariant is narrower: every id search
+  // claims must actually work, and every id it doesn't claim must refuse
+  // rather than silently answer from a neighbour's postings.
+  test("every searchable translation actually returns results", async () => {
     const { SEARCHABLE_TRANSLATIONS } = await import("./search.ts");
-    expect([...SEARCHABLE_TRANSLATIONS].sort()).toEqual([...TRANSLATION_IDS].sort());
+    expect([...SEARCHABLE_TRANSLATIONS].sort()).toEqual(["asv", "dra"]);
+    expect(SEARCHABLE_TRANSLATIONS.every((id) => TRANSLATION_IDS.includes(id))).toBe(true);
 
-    for (const id of TRANSLATION_IDS) {
+    for (const id of SEARCHABLE_TRANSLATIONS) {
       const response = await get(`/search?q=beginning&translation=${id}`);
       expect({ id, status: response.status }).toEqual({ id, status: 200 });
       expect(response.body.total).toBeGreaterThan(0);
+    }
+  });
+
+  test("an edition with no index refuses rather than answering from another's", async () => {
+    const { SEARCHABLE_TRANSLATIONS } = await import("./search.ts");
+    for (const id of TRANSLATION_IDS) {
+      if (SEARCHABLE_TRANSLATIONS.includes(id)) continue;
+      const response = await get(`/search?q=beginning&translation=${id}`);
+      expect({ id, status: response.status }).toEqual({ id, status: 501 });
+      expect(response.body.error).toBe("not_implemented");
     }
   });
 });
@@ -409,18 +421,24 @@ describe("a verse cannot be served under another edition's name", () => {
   });
 
   test("every route's verses match the translation it names", async () => {
+    const { SEARCHABLE_TRANSLATIONS } = await import("./search.ts");
     for (const id of TRANSLATION_IDS) {
+      // John, not Genesis: the one book every registered edition carries —
+      // SBLGNT is New Testament only, so an Old Testament reference would
+      // 404 for it rather than exercise what this test is actually checking.
       const passage = await passage_(id);
       expect(passage.body.translation.id).toBe(id);
 
-      const chapter = await get(`/books/GEN/chapters/1?translation=${id}`);
+      const chapter = await get(`/books/JHN/chapters/1?translation=${id}`);
       expect(chapter.status).toBe(200);
       expect(chapter.body.verses.length).toBeGreaterThan(0);
 
-      const search = await get(`/search?q=beginning&limit=5&translation=${id}`);
-      expect(search.body.translation.id).toBe(id);
+      if (SEARCHABLE_TRANSLATIONS.includes(id)) {
+        const search = await get(`/search?q=beginning&limit=5&translation=${id}`);
+        expect(search.body.translation.id).toBe(id);
+      }
     }
   });
 });
 
-const passage_ = (id: string) => passage("Genesis 1:1", id);
+const passage_ = (id: string) => passage("John 1:1", id);

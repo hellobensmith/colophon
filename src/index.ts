@@ -39,10 +39,12 @@ import {
   MAX_QUERY_TERMS,
   SEARCHABLE_TRANSLATIONS,
 } from "./search.ts";
+import { apparatusFor, APPARATUS_TRANSLATIONS } from "./apparatus.ts";
 import { DEMO_HTML } from "./demo.ts";
 import {
   DEFAULT_TRANSLATION,
   resolveTranslation,
+  TRANSLATIONS,
   TRANSLATION_IDS,
   UnknownTranslationError,
 } from "./translations.ts";
@@ -54,6 +56,14 @@ import { OPENAPI } from "./openapi.ts";
 /** Longest passage served in one response. */
 const MAX_PASSAGE_VERSES = 500;
 const MAX_SEARCH_LIMIT = 100;
+/**
+ * Longest apparatus response, counted in notes rather than verses: a legal
+ * verse range that stays well under MAX_PASSAGE_VERSES can still carry far
+ * more notes than verses (a busy chapter can average several notes per
+ * verse), so the two limits guard different things and neither substitutes
+ * for the other.
+ */
+const MAX_APPARATUS_NOTES = 2000;
 
 /**
  * Longest input accepted for a reference or a query.
@@ -291,6 +301,39 @@ app.get("/health", (context) => {
   });
 });
 
+/**
+ * What each registered edition can actually do — the thing a generic client
+ * cannot discover any other way once editions genuinely differ in
+ * capability, which SBLGNT is the first one to do (Greek, New Testament
+ * only, no search, apparatus only here). Every field below is derived from
+ * the same registries the routes themselves gate on, never hand-maintained,
+ * so it can't drift the way an unmonitored flag would.
+ */
+app.get("/translations", (context) => {
+  context.header("Cache-Control", DAILY);
+  return context.json({
+    default: DEFAULT_TRANSLATION,
+    translations: TRANSLATION_IDS.map((id) => {
+      const translation = TRANSLATIONS.get(id)!;
+      const testaments = new Set(
+        Object.keys(translation.verseCounts)
+          .map((bookId) => BOOKS.get(bookId)?.testament)
+          .filter((t): t is "OT" | "NT" => t !== undefined),
+      );
+      return {
+        ...translation.meta,
+        source: translation.source,
+        capabilities: {
+          search: SEARCHABLE_TRANSLATIONS.includes(id),
+          apparatus: APPARATUS_TRANSLATIONS.includes(id),
+          psalm_numbering: translation.psalmSchemes,
+          testaments: [...testaments].sort(),
+        },
+      };
+    }),
+  });
+});
+
 app.get("/books", (context) => {
   const translation = translationOf(context);
   const requested = context.req.query("tradition") ?? "protestant";
@@ -456,6 +499,96 @@ app.get("/passages", (context) => {
   });
 });
 
+/**
+ * The critical apparatus for a reference — textual variants the edition's
+ * own text doesn't carry inline (see src/sblgnt.ts's module doc comment for
+ * why apparatus glyphs are dropped from served verse text). A collation of
+ * printed editions, not manuscripts: no papyri, uncials, minuscules or
+ * patristic citations anywhere in it. See src/sblgnt-apparatus.ts.
+ */
+app.get("/apparatus", (context) => {
+  const translation = translationOf(context);
+  // Parallel to /search's gate: an edition with no apparatus data refuses
+  // rather than silently answering empty, which a caller could not tell
+  // apart from "this reference genuinely has no variants."
+  if (!APPARATUS_TRANSLATIONS.includes(translation.meta.id)) {
+    throw new HttpError(
+      501,
+      "not_implemented",
+      `A critical apparatus is not available for ${translation.meta.name}; none is embedded for it. ` +
+        `Editions with an apparatus: ${APPARATUS_TRANSLATIONS.join(", ")}. Passages and ` +
+        `books work for every translation this deployment serves.`,
+    );
+  }
+
+  const reference = context.req.query("ref");
+  if (reference === undefined || reference.trim() === "") {
+    throw new HttpError(400, "bad_request", 'The "ref" query parameter is required, for example ?ref=Jude 1:5');
+  }
+  if (reference.length > MAX_INPUT_LENGTH) {
+    throw new HttpError(
+      400,
+      "bad_request",
+      `A reference may be at most ${MAX_INPUT_LENGTH} characters; this one is ${reference.length}.`,
+    );
+  }
+
+  const parsed = parseReference(reference, { numbering: "english", translation: translation.meta.id });
+  if (parsed.verseCount > MAX_PASSAGE_VERSES) {
+    throw new HttpError(
+      413,
+      "payload_too_large",
+      `That reference covers ${parsed.verseCount} verses; the limit is ${MAX_PASSAGE_VERSES}. Request a smaller range.`,
+    );
+  }
+
+  const notes: {
+    id: string;
+    book: string;
+    chapter: number;
+    verse: number;
+    index: number;
+    lemma: string;
+    readings: readonly string[];
+    range: string | null;
+    raw: string;
+  }[] = [];
+  for (const segment of parsed.segments) {
+    for (let sequence = segment.start.sequence; sequence <= segment.end.sequence; sequence += 1) {
+      const verse = verseAt(sequence, translation.meta.id);
+      const forVerse = apparatusFor(translation.meta.id, verse.id);
+      forVerse.forEach((note, i) => {
+        notes.push({
+          id: `${verse.id}!${i + 1}`,
+          book: verse.book,
+          chapter: verse.chapter,
+          verse: verse.verse,
+          index: i + 1,
+          lemma: note.lemma,
+          readings: note.readings,
+          range: note.range,
+          raw: note.raw,
+        });
+      });
+    }
+  }
+
+  if (notes.length > MAX_APPARATUS_NOTES) {
+    throw new HttpError(
+      413,
+      "payload_too_large",
+      `That reference carries ${notes.length} apparatus notes; the limit is ${MAX_APPARATUS_NOTES}. Request a smaller range.`,
+    );
+  }
+
+  context.header("Cache-Control", VERSE_DATA);
+  return context.json({
+    reference: parsed.reference,
+    translation: translation.meta,
+    notes,
+  });
+});
+
 app.get("/search", (context) => {
   const translation = translationOf(context);
   // An edition without an index cannot be searched, and answering from
@@ -551,13 +684,20 @@ app.notFound((context) =>
     {
       error: "not_found",
       detail:
-        "Unknown endpoint. Available: /health, /books, /books/:id, /books/:id/chapters/:num, /passages, /search",
+        "Unknown endpoint. Available: /openapi.yaml, /health, /translations, /books, " +
+        "/books/:id, /books/:id/chapters/:num, /passages, /search, /apparatus",
     },
     404,
   ),
 );
 
 app.onError((error, context) => {
+  // Every error path, not just 501: this platform's cache does not purge on
+  // deploy (see the comment on VERSE_DATA above), so a cached failure could
+  // otherwise outlive the build that fixes it — e.g. a 501 for an edition
+  // that gains real support in the next deploy, still served from cache.
+  context.header("Cache-Control", "no-store");
+
   if (error instanceof HttpError) {
     return context.json({ error: error.code, detail: error.message }, error.status);
   }

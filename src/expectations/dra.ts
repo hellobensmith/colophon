@@ -71,6 +71,7 @@ export const DRA: CorpusExpectations = {
   books: BOOKS,
   // No footnotes, so nothing is printed as an empty placeholder.
   emptyVerses: [],
+  omittedVerses: [],
   // The superscriptions exist in the text; they are simply numbered as verse 1
   // rather than marked with <d>, so none reach the title bucket.
   titleCount: 0,

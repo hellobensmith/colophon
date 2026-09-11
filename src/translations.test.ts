@@ -63,6 +63,10 @@ describe("the translation registry", () => {
       const registered = resolveTranslation(id);
       const built = BUILD_EDITIONS.get(id);
       expect(built).toBeDefined();
+      // SBLGNT has no eBible archive at all — it's built only via --source,
+      // and its registered source.url points at SBLGNT.com, not a derived
+      // eBible archive URL, so there's nothing to compare here for it.
+      if (id === "sblgnt") continue;
       expect(registered.source.url).toBe(archiveUrl(built!));
     }
   });
