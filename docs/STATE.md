@@ -1,6 +1,6 @@
 # State — read this first
 
-Last updated 10 September 2026 · public repo · deployed
+Last updated 11 September 2026 · public repo · deployed
 
 This file is a **progress tracker**, not the source of truth. The code is the
 source of truth; this exists so a session does not re-derive what an earlier one
@@ -66,9 +66,9 @@ the command that refreshes it; re-run before relying on one.
 
 | Measurement | Value | Refresh with |
 |---|---|---|
-| Contract | 54/54 responses conform to `openapi.yaml` | `bun run check:contract` |
-| Bundle | 4.05 MB gzip against a 10 MB limit (paid plan; 3 MB is free-tier, which this deployment now exceeds) | `bun run deploy` output, or `check:platform --probe-limit` |
-| Production CPU | median 9-39 ms, worst 47-112 ms over eight runs (10 September, wider than the 7 September baseline — two more indexed translations and a heavier passage-read path); the worst tracks cold isolates, not the code. No CPU cap enforced. | `bun run check:platform` |
+| Contract | 56/56 responses conform to `openapi.yaml` (11 September — two new `501` cases added when `/apparatus` shipped) | `bun run check:contract` |
+| Bundle | 4.89 MB gzip against a 10 MB limit (paid plan; 3 MB is free-tier, which this deployment now exceeds) — 11 September deploy output, after adding the SBLGNT text and apparatus | `bun run deploy` output, or `check:platform --probe-limit` |
+| Production CPU | median 9-39 ms, worst 47-112 ms over eight runs (10 September, before the SBLGNT deploy — **not re-measured since**; the passage-read and apparatus-lookup paths both grew a translation-keyed branch, so treat this number as stale until re-checked, not as current). No CPU cap enforced. | `bun run check:platform` |
 | Repo | `github.com/hellobensmith/colophon`, **public** | — |
 
 ```bash
