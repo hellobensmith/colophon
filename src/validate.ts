@@ -23,6 +23,7 @@
 import type { ScriptureDocument } from "./document.ts";
 import { sumBucket, sumLedger } from "./document.ts";
 import { EDITION_ORDER, type EditionId } from "./canon.ts";
+import type { ScriptureFormat } from "./format.ts";
 
 /**
  * What one edition is expected to contain.
@@ -59,8 +60,23 @@ export interface CorpusExpectations {
    * and a guard that is quietly approximate is worse than one more field.
    */
   readonly expectsNotes: boolean;
-  /** Characters dropped on purpose, by element — the lossy inventory. */
-  readonly dropped: ReadonlyMap<string, number>;
+  /**
+   * Characters dropped on purpose, by element or marker — the lossy
+   * inventory, keyed by the format it was measured against.
+   *
+   * The shapes genuinely differ by format, not just by labelling: USFX
+   * drops XML attributes and elements, where USFM carries some of that same
+   * information — chapter/verse numbers, Strong's attribute tails — as
+   * literal text tokens, so it drops under a different key set entirely.
+   * One edition's ground truth is not one inventory measured twice; it is a
+   * separate inventory per format, and each is only as general as the real
+   * bundle it was measured against — a different publisher's file in the
+   * same format can carry markers this map has never seen, and the build
+   * refuses rather than guessing at what to do with them (see
+   * `validateCorpus`). This is runtime-enforced, not type-enforced: nothing
+   * here requires every format to be populated.
+   */
+  readonly dropped: ReadonlyMap<ScriptureFormat, ReadonlyMap<string, number>>;
   /** Verses whose brackets legitimately do not balance. */
   readonly unbalancedBrackets: readonly string[];
 }
@@ -217,15 +233,29 @@ export function validateCorpus(
     );
   }
 
-  for (const [element, characters] of expected.dropped) {
-    const actual = ledger.dropped.get(element) ?? 0;
-    if (actual !== characters) {
-      failures.push(`dropped <${element}>: expected ${characters} characters, got ${actual}`);
+  // Ground truth is authored per format (see the field's doc comment), so
+  // an edition that has never been measured in this format cannot be
+  // checked at all — that is reported alongside every other discrepancy
+  // here, not thrown early, so a missing-format gate never hides a real
+  // corruption already present in the same run.
+  const droppedExpected = expected.dropped.get(doc.format);
+  if (droppedExpected === undefined) {
+    failures.push(
+      `dropped-character expectations: no ${doc.format} ground truth authored for ` +
+        `${expected.editionId} yet — run build:data --report against this source, then add ` +
+        `a "${doc.format}" entry to dropped in src/expectations/${expected.editionId}.ts`,
+    );
+  } else {
+    for (const [element, characters] of droppedExpected) {
+      const actual = ledger.dropped.get(element) ?? 0;
+      if (actual !== characters) {
+        failures.push(`dropped <${element}>: expected ${characters} characters, got ${actual}`);
+      }
     }
-  }
-  for (const element of ledger.dropped.keys()) {
-    if (!expected.dropped.has(element)) {
-      failures.push(`<${element}>: dropping text that was not previously dropped`);
+    for (const element of ledger.dropped.keys()) {
+      if (!droppedExpected.has(element)) {
+        failures.push(`<${element}>: dropping text that was not previously dropped`);
+      }
     }
   }
 

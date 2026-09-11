@@ -544,6 +544,7 @@ export function parseUsfm(usfm: string): UsfmDocument {
     titles,
     subscriptions,
     books,
+    format: "usfm",
     ledger: {
       toVerses,
       toTitles,

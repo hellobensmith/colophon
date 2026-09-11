@@ -6,6 +6,8 @@
  * rather than one format getting a rigorous gate and the others a weaker one.
  */
 
+import type { ScriptureFormat } from "./format.ts";
+
 export interface Verse {
   readonly bcv: string;
   readonly book: string;
@@ -43,6 +45,8 @@ export interface CoverageLedger {
 }
 
 export interface ScriptureDocument {
+  /** Which reader produced this document — the key into per-format ground truth. */
+  readonly format: ScriptureFormat;
   readonly verses: readonly Verse[];
   /**
    * Chapter superscriptions printed *above* a chapter, keyed by

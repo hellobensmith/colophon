@@ -15,6 +15,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { parseUsfx, type UsfxDocument } from "./usfx.ts";
+import { parseUsfm } from "./usfm.ts";
 import { validateCorpus, ValidationError, type CorpusExpectations } from "./validate.ts";
 import { BOOKS } from "./canon.ts";
 
@@ -53,7 +54,7 @@ const BASE: CorpusExpectations = {
   titleCount: 0,
   subscriptions: [],
   expectsNotes: false,
-  dropped: new Map(),
+  dropped: new Map([["usfx", new Map()]]),
   unbalancedBrackets: [],
 };
 
@@ -61,7 +62,7 @@ const BASE: CorpusExpectations = {
 function expectationsFor(doc: UsfxDocument, over: Partial<CorpusExpectations> = {}): CorpusExpectations {
   const dropped = new Map<string, number>();
   for (const [element, count] of doc.ledger.dropped) dropped.set(element, count);
-  return { ...BASE, dropped, ...over };
+  return { ...BASE, dropped: new Map([["usfx", dropped]]), ...over };
 }
 
 function failuresFrom(fn: () => void): readonly string[] {
@@ -124,9 +125,26 @@ describe("the gate catches each kind of corruption", () => {
 
   test("an element dropping text it did not drop before", () => {
     const failures = failuresFrom(() =>
-      validateCorpus(doc, expectationsFor(doc, { dropped: new Map() })),
+      validateCorpus(doc, expectationsFor(doc, { dropped: new Map([["usfx", new Map()]]) })),
     );
     expect(failures.join()).toContain("dropping text that was not previously dropped");
+  });
+
+  test("a format with no ground truth authored fails loudly, not silently", () => {
+    // Same passage as ingest.test.ts's cross-format fixture, but validated
+    // against an expectations set that has only ever measured usfx.
+    const usfm = parseUsfm(
+      "\\id PSA - Test\n\\c 1\n\\p\n\\v 1 In the beginning.\n",
+    );
+    const failures = failuresFrom(() =>
+      validateCorpus(usfm, {
+        ...BASE,
+        order: ["PSA"],
+        totalVerses: 1,
+        books: new Map([["PSA", { chapters: 1, verses: 1 }]]),
+      }),
+    );
+    expect(failures.join()).toContain("no usfm ground truth authored for asv");
   });
 
   test("a verse still carrying markup is refused", () => {
@@ -212,8 +230,8 @@ describe("the two expectation sets describe two different texts", () => {
     expect(DRA.emptyVerses.length).toBe(0);
 
     // <cl> chapter labels occur in the DRA and never in the ASV.
-    expect(DRA.dropped.has("cl")).toBe(true);
-    expect(ASV.dropped.has("cl")).toBe(false);
+    expect(DRA.dropped.get("usfx")?.has("cl")).toBe(true);
+    expect(ASV.dropped.get("usfx")?.has("cl")).toBe(false);
   });
 
   test("the DRA supplies seven of the ten books the ASV only describes", async () => {

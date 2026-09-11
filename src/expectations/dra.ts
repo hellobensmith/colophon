@@ -76,13 +76,23 @@ export const DRA: CorpusExpectations = {
   titleCount: 0,
   subscriptions: [],
   expectsNotes: false,
+  // No USFM ground truth yet — there is no real DRA-as-USFM bundle on disk
+  // to measure against, and this project's rule is never to author a
+  // number without a real source to check it against. Real gap, not
+  // silently glossed over: `validateCorpus` refuses loudly rather than
+  // skipping the check if a USFM `--source` build of the DRA is ever tried.
   dropped: new Map([
-    // <cl> is a chapter label, and does not occur in the ASV at all.
-    ["cl", 6],
-    ["h", 633],
-    ["id", 73],
-    ["languageCode", 3],
-    ["toc", 2844],
+    [
+      "usfx",
+      new Map([
+        // <cl> is a chapter label, and does not occur in the ASV at all.
+        ["cl", 6],
+        ["h", 633],
+        ["id", 73],
+        ["languageCode", 3],
+        ["toc", 2844],
+      ]),
+    ],
   ]),
   unbalancedBrackets: [],
 };

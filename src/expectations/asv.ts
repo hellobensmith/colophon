@@ -102,6 +102,46 @@ export const EXPECTED_DROPPED: ReadonlyMap<string, number> = new Map([
   ["fr", 89],
 ]);
 
+/**
+ * The same edition, read as USFM instead of USFX — a different lossy
+ * inventory under a different key set, not the same one relabelled. USFM
+ * carries chapter/verse numbers and Strong's-number attribute tails as
+ * literal text tokens rather than XML attributes, so five of these keys
+ * (`chapter-number`, `verse-number`, `word-attribute`, `front-matter`,
+ * `footnote-caller`) have no USFX counterpart at all.
+ *
+ * Measured against the real eBible USFM release cached at
+ * `.cache/asv-usfm/` (68 files), via `bun run scripts/build-data.ts
+ * --translation asv --source .cache/asv-usfm --report`, 11 September 2026.
+ * `word-attribute` (10,580,670) was cross-checked independently by counting
+ * `|strong="..."` spans directly against the raw files.
+ *
+ * This is ground truth for *this bundle's* marker profile, not a claim
+ * that covers USFM as a format: a different publisher's USFM — one more
+ * `\rem`, a `\sp` speaker marker, no Strong's tails at all — will trip the
+ * key-set-parity check in `validateCorpus` on its first run and need its
+ * own map authored the same way, exactly as the DRA already needed its own
+ * USFX entry (`cl`) this edition's never had.
+ */
+export const EXPECTED_DROPPED_USFM: ReadonlyMap<string, number> = new Map([
+  ["chapter-number", 6624],
+  ["footnote-caller", 32],
+  ["fr", 89],
+  ["front-matter", 35868],
+  ["h", 630],
+  ["id", 2244],
+  ["ms1", 50],
+  ["mt1", 760],
+  ["mt2", 1204],
+  ["mt3", 90],
+  ["qc", 246],
+  ["toc1", 1893],
+  ["toc2", 630],
+  ["toc3", 421],
+  ["verse-number", 82827],
+  ["word-attribute", 10580670],
+]);
+
 export const ASV: CorpusExpectations = {
   editionId: "asv",
   totalVerses: EXPECTED_TOTAL_VERSES,
@@ -111,7 +151,10 @@ export const ASV: CorpusExpectations = {
   subscriptions: EXPECTED_SUBSCRIPTIONS,
   // The 16 omitted verses each carry an explanatory footnote.
   expectsNotes: true,
-  dropped: EXPECTED_DROPPED,
+  dropped: new Map([
+    ["usfx", EXPECTED_DROPPED],
+    ["usfm", EXPECTED_DROPPED_USFM],
+  ]),
   // The two ends of the disputed passage at John 7:53-8:11.
   unbalancedBrackets: ["JHN.7.53", "JHN.8.11"],
 };

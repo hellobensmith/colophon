@@ -113,7 +113,12 @@ USFX has, and `scripts/build-data.ts` dispatches by detected format.**
 the same `ScriptureDocument` (`src/document.ts`) every reader produces,
 carrying a full six-bucket `CoverageLedger` that balances against
 `sourceCharacters` — checked against the real ASV-as-USFM bundle
-(15,703,039 source characters), not just fixtures. The largest single gap
+(15,708,824 source characters, corrected 11 September 2026 — measured
+twice independently against the same on-disk bundle via `build-data.ts
+--report`; the figure recorded here the same day these readers landed did
+not match a fresh run and the discrepancy was not tracked down, so this is
+the number the code actually produces today, not a reconciliation of why
+the two differ), not just fixtures. The largest single gap
 closed was the `\w...|strong=...\w*` attribute tail: ~10.6M characters,
 two-thirds of the whole corpus, previously unaccounted for anywhere.
 `src/ingest.ts`'s `parseSource(text, format?)` is the pure dispatch seam —
@@ -431,11 +436,26 @@ which text it is holding. Repo, Worker, package and docs all renamed; the old
    merge the title-only model couldn't represent; see "Facts that were
    expensive to establish" above for the psalm-by-psalm summary and
    `src/psalms.ts`'s `irregularGreekParts` for the per-psalm detail.
-6. **`CorpusExpectations.dropped` has no per-format variant.** See "Phase 2
-   — bring your own text" above — a USFM-derived read of the ASV produces 16
-   dropped keys with no USFX counterpart, and `validateCorpus` requires
-   exact key-set parity. Not exercised by anything shipped today, so
-   inert but real.
+6. ~~`CorpusExpectations.dropped` has no per-format variant~~ **Resolved 11
+   September 2026.** It is now `ReadonlyMap<ScriptureFormat, ReadonlyMap<string,
+   number>>` (`src/validate.ts`), and every `ScriptureDocument` carries the
+   format that produced it. `validateCorpus` looks up ground truth by
+   `doc.format` and fails loudly — one more entry in the same failure list
+   as everything else, not a separate abort — when a format has none
+   authored yet. The ASV now has real ground truth for both `usfx` and
+   `usfm`, measured against `.cache/asv-usfm/`; a real end-to-end
+   `bun run build:data --translation asv --source .cache/asv-usfm` reaches
+   "Validating… all assertions passed" for the first time. Two gaps remain,
+   both deliberate and both loud rather than silent: no USFM ground truth
+   for the DRA (no real DRA-as-USFM bundle exists to measure against) and
+   no USX ground truth for the ASV (no real ASV-as-USX bundle exists
+   either). Neither is exercised by the shipped build. And a caveat worth
+   keeping in mind before trusting this for a third-party publisher's file:
+   the USFM ground truth is scoped to this specific eBible bundle's marker
+   profile, not to USFM as a format — a file using markers this bundle
+   never triggers (`\rem`, `\sp`, a different Strong's convention) will
+   trip the same parity check on its first run and need its own ground
+   truth authored the same way.
 7. **`PARSER_VERSION` was not bumped for the USX misclassification fixes,
    or for the three USFM/USX bugs fixed 10 September** (inline apparatus
    truncation, cross-references filed as notes, unparseable table/figure/

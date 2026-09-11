@@ -401,6 +401,7 @@ export function parseUsfx(xml: string): UsfxDocument {
     titles,
     subscriptions,
     books,
+    format: "usfx",
     ledger: {
       toVerses,
       toTitles,
